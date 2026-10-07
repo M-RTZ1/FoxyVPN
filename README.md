@@ -1,30 +1,23 @@
 <div align="center">
 
-<div align="center">
-
-# 🦊 FoxyVPN for Windows
+# 🦊 FoxyVPN Desktop
 
 <p align="center">
-  <img src="assets/images/foxyvpn_logo.jpg" alt="FoxyVPN logo" width="140"/>
+  <img src="assets/images/foxyvpn_logo.jpg" alt="FoxyVPN Desktop" width="120"/>
 </p>
 
-![Windows](https://img.shields.io/badge/Windows-10%2F11_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)
-![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-black?style=for-the-badge)
+<p align="center">
+  <b>Secure • Fast • Private VPN Client for Windows</b>
+</p>
+
+<br>
+
+<img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows&logoColor=white"/>
+<img src="https://img.shields.io/badge/Built%20With-Flutter-02569B?style=flat-square&logo=flutter&logoColor=white"/>
+<img src="https://img.shields.io/badge/Language-Dart-0175C2?style=flat-square&logo=dart&logoColor=white"/>
+<img src="https://img.shields.io/badge/License-MIT-green?style=flat-square"/>
 
 </div>
-
-*FoxyVPN for Windows signs in with a Firefox account, obtains a proxy pass from
-Mozilla's Guardian service, and carries the whole PC's traffic through Firefox
-VPN's Fastly edge over HTTP/2 tunnels. It is the desktop port of the FoxyVPN
-Android app, written in Dart with Flutter (Material 3).*
-
-**No subscription. No WireGuard.** It runs on the free **50 GB/month** of VPN
-traffic Mozilla includes with a Firefox account.
-
-</div>
-
 <br>
 
 ## 🔎 Features

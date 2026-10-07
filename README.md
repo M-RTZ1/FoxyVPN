@@ -1,15 +1,19 @@
 <div align="center">
 
-# FoxyVPN for Windows
+<div align="center">
+
+# 🦊 FoxyVPN for Windows
 
 <p align="center">
   <img src="assets/images/foxyvpn_logo.jpg" alt="FoxyVPN logo" width="140"/>
 </p>
 
 ![Windows](https://img.shields.io/badge/Windows-10%2F11_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)
-![Flutter](https://img.shields.io/badge/Flutter-0288D1?style=for-the-badge&logo=flutter&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-212121?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-black?style=for-the-badge)
+
+</div>
 
 *FoxyVPN for Windows signs in with a Firefox account, obtains a proxy pass from
 Mozilla's Guardian service, and carries the whole PC's traffic through Firefox

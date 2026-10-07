@@ -288,7 +288,7 @@ require a proxy.
 
 - [firefox-vpn-client](https://github.com/UjuiUjuMandan/firefox-vpn-client) —
   the Go reference client the original app is a port of
-- [FoxyVPN](https://github.com/M-RTZ1/FoxyVPN) — the Android app this is ported
+- [FoxyVPN](https://github.com/Vauth/FoxyVPN) — the Android app this is ported
   from
 - [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) — the native
   tun2socks engine

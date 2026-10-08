@@ -45,17 +45,14 @@ FoxyVPN uses a Firefox account and Mozilla's VPN infrastructure to provide VPN a
 > of Android's `VpnService.addDisallowedApplication`, so it is intentionally
 > left out rather than faked.
 
-<br>
-
 ## 📸 Screenshots
-<img width="426" height="981" alt="Home 2026-10-08 154122" src="https://github.com/user-attachments/assets/140d3437-81a8-4d9d-bd9c-b8933fc3a85f" />
 
-<img width="423" height="984" alt="Server" src="https://github.com/user-attachments/assets/4d9797df-6338-4e8b-8083-9abb339f0e7e" />
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/140d3437-81a8-4d9d-bd9c-b8933fc3a85f" width="30%" alt="Home">
+  <img src="https://github.com/user-attachments/assets/4d9797df-6338-4e8b-8083-9abb339f0e7e" width="30%" alt="Server">
+  <img src="https://github.com/user-attachments/assets/6be6a236-6d5e-4eef-9c88-7c3237495116" width="30%" alt="Settings">
+</p>
 
-<img width="423" height="984" alt="Settings" src="https://github.com/user-attachments/assets/6be6a236-6d5e-4eef-9c88-7c3237495116" />
-
-
-<br>
 
 ## 🧿 How it works
 

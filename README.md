@@ -19,31 +19,30 @@ FoxyVPN uses a Firefox account and Mozilla's VPN infrastructure to provide VPN a
 
 </div>
 
-
 <br>
 
 ## 🔎 Features
 
-| | |
-|---|---|
-| 🛡 **System-wide VPN** | A `wintun` adapter plus host-side default-route and DNS takeover |
-| 🦊 **Firefox account sign-in** | FxA OAuth + PBKDF2 / HKDF / Hawk, tokens in the Windows credential vault |
-| 🌍 **Multiple servers** | Location picker fed by Mozilla's Remote Settings, with edge failover |
-| 🔌 **Proxy-only mode** | Local proxy on `127.0.0.1:21080` — no adapter, no admin rights needed |
-| 🖥 **Windows system proxy** | Registers the local port as the machine proxy, restores it on disconnect |
-| 🔗 **Upstream proxy chaining** | Dials Fastly (and the control plane) through an existing SOCKS5/HTTP proxy |
-| 🔐 **Encrypted DNS** | DNS-over-HTTPS resolution plus `mapdns` fake-IP handling |
-| 🚪 **Exit verification** | Confirms your public IP changed before reporting "connected" |
-| 📊 **Live stats + logs** | Speed counters and an in-app log viewer |
-| 🌗 **Dark / light / system theme** | |
-| 🔤 **English & فارسی** | Full RTL layout with the Vazirmatn font |
-| 🔔 **Update check** | Notices a newer GitHub release and links straight to its download |
-| 📱 **Phone-sized window** | Fixed 360×800 (9:20), non-resizable — same layout as the Android UI |
+| Feature                     | Description                                                         |
+| --------------------------- | ------------------------------------------------------------------- |
+| 🛡 **System-wide VPN**      | Routes Windows traffic through a Wintun adapter and VPN tunnel      |
+| 🦊 **Firefox account**      | Sign in with a Firefox account                                      |
+| 🌍 **Multiple servers**     | Choose from available VPN locations                                 |
+| 🔌 **Proxy-only mode**      | Local SOCKS5/HTTP proxy without VPN adapter or administrator rights |
+| 🖥 **Windows system proxy** | Automatically configure the Windows proxy                           |
+| 🔗 **Upstream proxy**       | Connect through an existing SOCKS5 or HTTP proxy                    |
+| 🔐 **Encrypted DNS**        | DNS-over-HTTPS with fake-IP handling                                |
+| 🚪 **Exit verification**    | Checks that the public IP has changed                               |
+| 📊 **Live statistics**      | View connection speed and application logs                          |
+| 🌗 **Themes**               | Dark, light and system themes                                       |
+| 🔤 **Languages**            | English and فارسی with RTL support                                  |
+| 🔔 **Update checker**       | Checks for newer GitHub releases                                    |
+| 📱 **Compact UI**           | Fixed 360×800 window matching the Android layout                    |
 
 > [!NOTE]
-> **Not (yet) on Windows:** per-app split tunneling. Windows has no equivalent
-> of Android's `VpnService.addDisallowedApplication`, so it is intentionally
-> left out rather than faked.
+> Per-app split tunneling is currently not available on Windows.
+
+<br>
 
 ## 📸 Screenshots
 
@@ -53,86 +52,68 @@ FoxyVPN uses a Firefox account and Mozilla's VPN infrastructure to provide VPN a
   <img src="https://github.com/user-attachments/assets/6be6a236-6d5e-4eef-9c88-7c3237495116" width="30%" alt="Settings">
 </p>
 
+<br>
 
-## 🧿 How it works
+## 🧿 How It Works
 
+```text
+Windows Apps
+     │
+     ▼
+Wintun Adapter
+     │
+     ▼
+hev-socks5-tunnel
+     │
+     ▼
+Local Proxy
+127.0.0.1:21080
+     │
+     ▼
+HTTP/2 + TLS
+     │
+     ▼
+Fastly Edge
+     │
+     ▼
+Internet
 ```
-Windows apps
-     │
-     ▼
-wintun adapter (10.8.0.2, MTU 8500)   ◄── default route + DNS moved here by the app
-     │
-     ▼
-hev-socks5-tunnel (child process)     ◄── mapdns fake-IP 100.64.0.0/10, DNS at 198.18.0.2
-     │  SOCKS5 / HTTP
-     ▼
-LocalSocks5Server (Dart, 127.0.0.1:21080)   ◄── mixed-protocol port
-     │  one HTTP/2 stream per connection
-     ▼
-H2UpstreamSession (TLS + ALPN h2 + Bearer proxy pass)
-     │
-     ▼
-Fastly edge  ──►  Internet
-```
 
-| Path | Role |
-|---|---|
-| `lib/vpn/vpn_controller.dart` | Orchestrator: connect flow, watchdog, edge rotation, proxy-pass renewal, exit check, stats. Port of Android's `FoxyVpnService`. |
-| `lib/vpn/route_manager.dart` | The Windows-specific part: bypass routes, default-route takeover, DNS swap, ordered restore |
-| `lib/vpn/local_socks5_server.dart` | Mixed SOCKS5 **and** HTTP frontend on one port |
-| `lib/vpn/system_proxy_manager.dart` | `HKCU\...\Internet Settings` + wininet broadcast |
-| `lib/vpn/h2_upstream_session.dart` | HTTP/2 CONNECT streams to the edge, with proxy chaining |
-| `lib/data/` | FxA auth, Guardian proxy passes, server list, Fastly challenge solver, settings, secure storage |
-| `lib/ui/` | Home, locations, login, settings, logs |
+### Main Components
 
-<details>
-<summary><b>Why the app has to touch the route table itself</b></summary>
+| File                                | Purpose                                                        |
+| ----------------------------------- | -------------------------------------------------------------- |
+| `lib/vpn/vpn_controller.dart`       | VPN connection flow, watchdog, server switching and statistics |
+| `lib/vpn/route_manager.dart`        | Windows routes and DNS management                              |
+| `lib/vpn/local_socks5_server.dart`  | Local SOCKS5 and HTTP proxy                                    |
+| `lib/vpn/system_proxy_manager.dart` | Windows system proxy management                                |
+| `lib/vpn/h2_upstream_session.dart`  | HTTP/2 connection to the VPN edge                              |
+| `lib/data/`                         | Authentication, server data, settings and secure storage       |
+| `lib/ui/`                           | Application screens and user interface                         |
 
 <br>
 
-`hev-socks5-tunnel` creates the adapter but deliberately does **not** modify
-routes or DNS on Windows, so the app does that host-side:
+## 🚀 How to Use
 
-- **Bypass first.** Before the engine starts it resolves the control-plane
-  hosts, the DoH servers, the chosen edge and the upstream-proxy host, and
-  installs `/32` bypass routes through the *physical* gateway. Without this the
-  app's own connection would loop back into the tunnel.
-- **Then take over.** Once the adapter is up, the IPv4 default route moves onto
-  wintun and system DNS points at the engine's mapdns listener (or your custom
-  server).
-- **Literal-IP edge dials.** Under takeover the OS resolver returns fake IPs,
-  so the edge and proxy connections always use a pre-cached literal address.
-- **Clean teardown.** Disconnecting — or closing the window — restores the
-  original default route and DNS servers, in order, before the engine stops.
+1. Create a free Firefox account.
+2. Launch `FoxyVPN.exe`.
+3. Sign in with your Firefox account.
+4. Select a location.
+5. Press the power button.
 
-IPv6 is not taken over, because the adapter is IPv4-only.
-
-</details>
-
-<br>
-
-## 🚀 How to use
-
-1. **Get a Firefox account** — create one for free at
-   [accounts.firefox.com](https://accounts.firefox.com/signup).
-2. **Launch `FoxyVPN.exe`** (it asks for administrator rights once).
-3. **Sign in** with that account's email and password.
-4. **Pick a location** and press the power button.
+Full-VPN mode requires administrator privileges.
 
 > [!IMPORTANT]
-> Once the free 50 GB monthly allowance is used up, connections stop working
-> until it resets. The app surfaces that as a quota error rather than silently
-> retrying.
+> The free VPN allowance is limited. When the monthly allowance is exhausted, VPN connections will stop until the allowance resets.
 
 <br>
 
 ## 🗃 Requirements
 
-- Windows 10 / 11, x64
-- **Administrator rights** for full-VPN mode (creating the adapter and editing
-  the route table). Proxy-only mode needs none.
-- For building: Flutter for Windows desktop, and the Visual Studio *Desktop
-  development with C++* workload
+* Windows 10 / 11 x64
+* Administrator privileges for Full-VPN mode
+* Flutter SDK for building
+* Visual Studio with **Desktop development with C++**
 
 <br>
 
@@ -146,94 +127,117 @@ flutter pub get
 flutter build windows --release
 ```
 
-Output: `build\windows\x64\runner\Release\`.
+Build output:
 
-Checks before you commit:
+```text
+build\windows\x64\runner\Release\
+```
+
+Before committing:
 
 ```bash
 flutter analyze
 flutter test
-``` 📸 Screenshots
-<img width="426" height="981" alt="Screenshot 2026-10-08 154122" src="https://github.com/user-attachments/assets/5762f21d-6256-4217-b648-018c6896a63c" />
-
-
-### Publishing a release
-
-The in-app check reads `https://api.github.com/repos/M-RTZ1/FoxyVPN/releases/latest`:
-
-- Tag the release with the pubspec version verbatim (`1.0.1+2`). A leading `v`
-  and a `+build` suffix are ignored when comparing, but the tag has to describe
-  a higher number than the running build.
-- Upload **a zip of the whole `Release` folder**, not `FoxyVPN.exe` on its own:
-  the exe needs `flutter_windows.dll`, the plugin DLLs and `data\` beside it.
-- At most one check per 24 hours is sent, and dismissing a version silences
-  only that version — the next release asks again. Settings → About can poll
-  on demand.
+```
 
 <br>
 
-## 🪟 Two things to know before connecting
+## 🚀 Publishing a Release
 
-### 1. Administrator rights
+1. Update the version in `pubspec.yaml`.
+2. Create a GitHub Release using the same version.
+3. Build the application with:
 
-The app declares `requireAdministrator` in
-`windows\runner\runner.exe.manifest`, because creating a wintun adapter and
-editing the route table need elevation. If you only want proxy-only mode
-without elevation, delete the `trustInfo` block and the `/MANIFESTUAC:NO` line
-in `windows\runner\CMakeLists.txt`.
+```bash
+flutter build windows --release
+```
 
-For `flutter run`, launch it from an **already elevated** terminal — otherwise
-Windows shows a UAC prompt for the child process and the debugger cannot attach
-through it. The release exe prompts once on double-click, as usual.
+4. ZIP the **entire `Release` folder**.
+5. Upload the ZIP to the GitHub Release.
 
-### 2. The tunnel engine is already bundled
-
-The tun2socks engine is the native binary from
-[heiher/hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel/releases).
-A copy of **v2.18.0** (`hev-socks5-tunnel.exe`, `wintun.dll`, `msys-2.0.dll`)
-lives in `third_party\hev-socks5-tunnel\bin\`, and the CMake build copies it
-next to the app for every Debug and Release build — so a fresh `git clone`
-works without a manual download step.
-
-To upgrade: extract a newer `hev-socks5-tunnel-win64.zip` over those three
-files and rebuild. Settings → *hev-socks5-tunnel.exe path* can also point at
-any other copy. If the files are missing, full-VPN connect reports
-"hev-socks5-tunnel.exe was not found" while proxy-only mode keeps working.
+> [!IMPORTANT]
+> Do not upload only `FoxyVPN.exe`. The application also requires its DLL files and `data` directory.
 
 <br>
 
-## 🌐 Three ways to route traffic
+## 🪟 VPN Modes
 
-### Full-VPN mode *(default)*
+### Full-VPN Mode
 
-Needs admin. Takes over the default route and DNS as described above, so every
-app on the machine goes through the tunnel without configuration.
+Full-VPN mode:
 
-### Proxy-only mode
+* Requires administrator privileges
+* Creates the Wintun adapter
+* Takes over the IPv4 default route
+* Configures DNS
+* Routes system traffic through the VPN
 
-Settings → **Proxy-only mode**. The app just runs the local proxy at
-`127.0.0.1:21080` (port configurable) and you point browsers or apps at it
-manually. No wintun, no native binary, no elevation.
+### Proxy-only Mode
 
-The port is **mixed-protocol**: it speaks SOCKS5 *and* plain HTTP proxying
-(`CONNECT` plus absolute-URI requests) on the same socket — which is exactly
-what Windows' system proxy expects.
+Proxy-only mode runs a local proxy without creating a VPN adapter.
 
-Edits in Settings are saved the moment a field loses focus, and while
-proxy-only mode is connected the listener rebinds to the new address or port
-right away (the Windows system proxy is repointed too). In full-VPN mode the
-change lands on the next connect, since the tunnel engine is launched with the
-port baked into its config.
+Default address:
 
-### Windows system proxy
+```text
+127.0.0.1:21080
+```
 
-Settings → **Set as Windows system proxy**. While connected, the app writes
-`ProxyEnable` / `ProxyServer` (`127.0.0.1:<port>`) to the Internet Settings key
-and broadcasts the change through wininet, so browsers and every other
-proxy-aware app use the tunnel with no per-app setup. The previous values are
-restored on disconnect and when the window closes.
+The proxy supports:
 
-If the app is killed abruptly, reset it by hand:
+* SOCKS5
+* HTTP proxy
+* HTTP `CONNECT`
+
+No administrator privileges are required.
+
+### Windows System Proxy
+
+FoxyVPN can configure the Windows system proxy automatically.
+
+The previous proxy settings are restored when the VPN disconnects.
+
+<br>
+
+## 🔗 Upstream Proxy
+
+FoxyVPN can connect to the VPN service through an existing:
+
+* SOCKS5 proxy
+* HTTP proxy
+
+The upstream proxy can also be copied from the current Windows system proxy settings.
+
+In Full-VPN mode, the upstream proxy is bypassed from the VPN route to prevent routing loops.
+
+<br>
+
+## 🔧 Tunnel Engine
+
+FoxyVPN uses [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) together with Wintun.
+
+The required native files are included in:
+
+```text
+third_party\hev-socks5-tunnel\bin\
+```
+
+A fresh clone therefore does not require a separate tunnel-engine download.
+
+If the tunnel files are missing, Full-VPN mode will not start, while Proxy-only mode can still be used.
+
+<br>
+
+## 🔧 Troubleshooting
+
+| Problem                             | Possible solution                                                  |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| Tunnel exits immediately            | Check that `wintun.dll` and the tunnel files are present           |
+| Nothing loads after connecting      | Check the **Logs** tab and try another server                      |
+| Route errors                        | Check whether another VPN or security software is modifying routes |
+| Proxy remains enabled after a crash | Disable the Windows system proxy manually                          |
+| Quota error                         | The monthly VPN allowance has been exhausted                       |
+
+To disable the Windows system proxy:
 
 ```bat
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f
@@ -241,92 +245,66 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v Pr
 
 <br>
 
-## 🔗 Chaining through another proxy
+## 📱 Differences from Android
 
-Settings → **Use an upstream proxy** makes the app reach the Fastly edges
-through an existing SOCKS5 or HTTP proxy (optional credentials are stored in
-the Windows credential vault). Sign-in, Guardian, the server list and DoH
-requests chain through it too, so the whole program works on networks that
-require a proxy.
-
-- **Copy from Windows system proxy** fills the fields from the machine's
-  current proxy setting.
-- In full-VPN mode the proxy host is added to the bypass route set, so the
-  chain leaves through the physical gateway instead of looping into wintun.
-- **Known limitation:** the control-plane half cannot attach proxy credentials
-  (a `dart:io` `findProxy` limitation). Use a no-auth proxy for that path, or
-  put the credentials on the edge connection.
-
-<br>
-
-## 🔧 Troubleshooting
-
-| Symptom | Cause / fix |
-|---|---|
-| `the tunnel process exited immediately` | `wintun.dll` missing next to the binary, or the app is not elevated |
-| Connects, but nothing loads | Check the **Logs** tab; if the upstream dial fails, pick another location or clear a pinned edge |
-| `route add` failures | Some security software blocks route manipulation — the app logs a warning and may still work, more slowly |
-| Traffic still looks direct | Another VPN or a static route is winning — the app's takeover assumes it owns the IPv4 default route |
-| Proxy settings stuck after a crash | Run the `reg add` command above |
-| Quota error | The 50 GB monthly allowance is spent; it resets with your billing month |
-
-<br>
-
-## 📱 Differences from the Android app
-
-- No per-app split tunneling.
-- Speed statistics come from the in-app SOCKS5/HTTP proxy counters instead of
-  the Android `VpnService` stats.
-- The exit check uses a plain-HTTP `ip-api.com` request over a tunnel stream
-  rather than the Cloudflare HTTPS trace.
-- Exit-check and DNS settings live under the Settings tab — same options as
-  Android, minus app exclusion.
+* No per-app split tunneling
+* Windows-specific route and DNS management
+* Windows system proxy support
+* Speed statistics use the local proxy counters
+* Compact desktop interface
 
 <br>
 
 ## 📝 To-Do
 
-- [x] Route/DNS takeover, so the bundled engine actually carries traffic.
-- [x] Mixed-protocol local port, Windows system proxy, upstream chaining.
-- [x] App icon and in-app logo.
-- [ ] Installer and auto-update.
-- [ ] IPv6 support (needs an IPv6-capable tunnel path).
-- [ ] Per-app split tunneling on Windows.
-- [ ] HTTP/3 implementation *(not planned yet)*.
+* [x] VPN routing
+* [x] DNS management
+* [x] SOCKS5/HTTP proxy
+* [x] Windows system proxy
+* [x] Upstream proxy support
+* [x] App icon and logo
+* [ ] Installer and auto-update
+* [ ] IPv6 support
+* [ ] Per-app split tunneling
+* [ ] HTTP/3
 
 <br>
 
 ## ✍️ Acknowledgements
 
-- [firefox-vpn-client](https://github.com/UjuiUjuMandan/firefox-vpn-client) —
-  the Go reference client the original app is a port of
-- [FoxyVPN](https://github.com/Vauth/FoxyVPN) — the Android app this is ported
-  from
-- [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) — the native
-  tun2socks engine
-- [wintun](https://www.wintun.net/) — the userspace tunnel driver
-- [Flutter](https://flutter.dev) and [dart:io / package:http2](https://pub.dev) —
-  the desktop UI and the HTTP/2 stack
+* [firefox-vpn-client](https://github.com/UjuiUjuMandan/firefox-vpn-client) — Go reference client
+* [FoxyVPN](https://github.com/Vauth/FoxyVPN) — Android version
+* [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) — tunnel engine
+* [Wintun](https://www.wintun.net/) — Windows tunnel driver
+* [Flutter](https://flutter.dev) — desktop UI framework
 
 <br>
 
 ## 🛠 Contributing
 
-Contributions are welcome — open an issue first for anything bigger than a typo,
-and send `flutter analyze` / `flutter test` results clean with your pull request.
+Contributions are welcome.
+
+For larger changes, please open an issue before submitting a pull request.
+
+Before submitting a pull request, make sure these commands pass:
+
+```bash
+flutter analyze
+flutter test
+```
 
 <br>
 
 ## ⚠️ Disclaimer
 
-Unofficial client. Not affiliated with, endorsed by, or supported by Mozilla or
-Fastly. It uses the same public endpoints and free entitlement the Firefox
-browser's built-in VPN uses; treat account credentials accordingly and review
-the code before trusting it with your traffic.
+FoxyVPN is an unofficial client and is not affiliated with, endorsed by, or supported by Mozilla or Fastly.
+
+Review the source code before using the application with your Firefox account or network traffic.
 
 <br>
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the
-[LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
+
+See the [LICENSE](LICENSE) file for details.

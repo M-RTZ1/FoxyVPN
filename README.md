@@ -167,7 +167,9 @@ Checks before you commit:
 ```bash
 flutter analyze
 flutter test
-```
+``` 📸 Screenshots
+<img width="426" height="981" alt="Screenshot 2026-10-08 154122" src="https://github.com/user-attachments/assets/5762f21d-6256-4217-b648-018c6896a63c" />
+
 
 ### Publishing a release
 

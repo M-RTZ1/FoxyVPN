@@ -6,20 +6,19 @@
   <img src="assets/images/foxyvpn_logo.jpg" alt="FoxyVPN logo" width="140"/>
 </p>
 
-![Windows](https://img.shields.io/badge/Windows-10%2F11_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)
-![Flutter](https://img.shields.io/badge/Flutter-0288D1?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%2F11_x64-0078D4?style=for-the-badge\&logo=windows\&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-0288D1?style=for-the-badge\&logo=flutter\&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge\&logo=dart\&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-212121?style=for-the-badge)
 
-*FoxyVPN for Windows signs in with a Firefox account, obtains a proxy pass from
-Mozilla's Guardian service, and carries the whole PC's traffic through Firefox
-VPN's Fastly edge over HTTP/2 tunnels. It is the desktop port of the FoxyVPN
-Android app, written in Dart with Flutter (Material 3).*
+A simple Windows VPN client built with Flutter and Dart.
 
-**No subscription. No WireGuard.** It runs on the free **50 GB/month** of VPN
-traffic Mozilla includes with a Firefox account.
+FoxyVPN uses a Firefox account and Mozilla's VPN infrastructure to provide VPN access on Windows.
+
+**Free • No subscription • Windows 10/11**
 
 </div>
+
 
 <br>
 
@@ -49,7 +48,12 @@ traffic Mozilla includes with a Firefox account.
 <br>
 
 ## 📸 Screenshots
-<img width="426" height="981" alt="Screenshot 2026-10-08 154122" src="https://github.com/user-attachments/assets/140d3437-81a8-4d9d-bd9c-b8933fc3a85f" />
+<img width="426" height="981" alt="Home 2026-10-08 154122" src="https://github.com/user-attachments/assets/140d3437-81a8-4d9d-bd9c-b8933fc3a85f" />
+
+<img width="423" height="984" alt="Server" src="https://github.com/user-attachments/assets/4d9797df-6338-4e8b-8083-9abb339f0e7e" />
+
+<img width="423" height="984" alt="Settings" src="https://github.com/user-attachments/assets/6be6a236-6d5e-4eef-9c88-7c3237495116" />
+
 
 <br>
 
@@ -299,7 +303,7 @@ require a proxy.
 
 - [firefox-vpn-client](https://github.com/UjuiUjuMandan/firefox-vpn-client) —
   the Go reference client the original app is a port of
-- [FoxyVPN](https://github.com/M-RTZ1/FoxyVPN) — the Android app this is ported
+- [FoxyVPN](https://github.com/Vauth/FoxyVPN) — the Android app this is ported
   from
 - [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) — the native
   tun2socks engine

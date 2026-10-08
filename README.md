@@ -49,22 +49,7 @@ traffic Mozilla includes with a Firefox account.
 <br>
 
 ## 📸 Screenshots
-
-> [!TIP]
-> Screenshots are not committed yet. Drop captures into `docs/screenshots/`
-> (`home.png`, `servers.png`, `settings.png`, `logs.png`) and uncomment the
-> gallery block at the bottom of this file — the markup is already prepared.
-
-<!--
-<table>
-  <tr>
-    <td><img src="docs/screenshots/home.png" alt="Home / connect" width="220"/></td>
-    <td><img src="docs/screenshots/servers.png" alt="Location list" width="220"/></td>
-    <td><img src="docs/screenshots/settings.png" alt="Settings" width="220"/></td>
-    <td><img src="docs/screenshots/logs.png" alt="Logs" width="220"/></td>
-  </tr>
-</table>
--->
+<img width="426" height="981" alt="Screenshot 2026-10-08 154122" src="https://github.com/user-attachments/assets/140d3437-81a8-4d9d-bd9c-b8933fc3a85f" />
 
 <br>
 

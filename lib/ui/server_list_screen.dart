@@ -4,6 +4,7 @@ import '../core/app_logger.dart';
 import '../data/models.dart' hide ConnectionState;
 import '../data/proxy_state_store.dart';
 import '../data/server_list_client.dart';
+import '../l10n/generated/app_localizations.dart';
 
 /// Mozilla VPN server list: pick a country, then a specific edge.
 class ServerListScreen extends StatefulWidget {
@@ -40,12 +41,13 @@ class _ServerListScreenState extends State<ServerListScreen> {
   Future<void> _selectCandidate(ProxyCandidate candidate) async {
     ProxyStateStore.instance.save(candidate);
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     final country = candidate.countryName.isNotEmpty
         ? candidate.countryName
         : candidate.countryCode;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Location set to $country (${candidate.authority})'),
+        content: Text(l10n.serversLocationSet(country, candidate.authority)),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -54,13 +56,14 @@ class _ServerListScreenState extends State<ServerListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Locations'),
+        title: Text(l10n.serversTitle),
         centerTitle: true,
         actions: [
           IconButton(
-            tooltip: 'Reload',
+            tooltip: l10n.serversReload,
             icon: const Icon(Icons.refresh),
             onPressed: _reload,
           ),
@@ -75,14 +78,14 @@ class _ServerListScreenState extends State<ServerListScreen> {
             }
             if (snapshot.hasError) {
               return _ErrorState(
-                message: 'Could not load the server list: ${snapshot.error}',
+                message: l10n.serversLoadFailed('${snapshot.error}'),
                 onRetry: _reload,
               );
             }
             final countries = snapshot.data ?? const [];
             if (countries.isEmpty) {
               return _ErrorState(
-                message: 'No locations are available right now.',
+                message: l10n.serversNoneAvailable,
                 onRetry: _reload,
               );
             }
@@ -121,6 +124,7 @@ class _CountryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return ListView.separated(
       itemCount: countries.length + 1,
       separatorBuilder: (_, _) => const Divider(height: 1),
@@ -128,16 +132,15 @@ class _CountryList extends StatelessWidget {
         if (index == 0) {
           return ListTile(
             leading: const Icon(Icons.auto_awesome),
-            title: const Text('Recommended for you'),
-            subtitle: const Text(
-                'Choose automatically from the fastest available country'),
+            title: Text(l10n.serversRecommended),
+            subtitle: Text(l10n.serversRecommendedSubtitle),
             onTap: () {
               ProxyStateStore.instance.clear();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Location will be chosen automatically'),
+                SnackBar(
+                  content: Text(l10n.serversAutoChosen),
                   behavior: SnackBarBehavior.floating,
-                  duration: Duration(seconds: 2),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             },
@@ -150,7 +153,7 @@ class _CountryList extends StatelessWidget {
             child: Text(country.code.isEmpty ? '?' : country.code[0]),
           ),
           title: Text(country.name.isEmpty ? country.code : country.name),
-          subtitle: Text('${country.cities.length} city(ies)'),
+          subtitle: Text(l10n.serversCityCount(country.cities.length)),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => onTap(country),
         );
@@ -173,6 +176,7 @@ class _CityServersPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = ProxyStateStore.instance.load();
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(country.name.isEmpty ? country.code : country.name),
@@ -180,7 +184,7 @@ class _CityServersPage extends StatelessWidget {
       ),
       body: SafeArea(
         child: candidates.isEmpty
-            ? const Center(child: Text('No usable servers in this country.'))
+            ? Center(child: Text(l10n.serversNoServers))
             : ListView.separated(
                 itemCount: candidates.length,
                 separatorBuilder: (_, _) => const Divider(height: 1),
@@ -200,7 +204,7 @@ class _CityServersPage extends StatelessWidget {
                     title: Text(candidate.cityCode.isEmpty
                         ? candidate.host
                         : '${candidate.cityCode} • ${candidate.host}'),
-                    subtitle: Text('port ${candidate.port}'),
+                    subtitle: Text(l10n.serversPort(candidate.port)),
                     onTap: () => onSelect(candidate),
                   );
                 },
@@ -219,6 +223,7 @@ class _ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -233,7 +238,7 @@ class _ErrorState extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
               icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+              label: Text(l10n.serversTryAgain),
               onPressed: onRetry,
             ),
           ],

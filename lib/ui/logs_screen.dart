@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../core/app_logger.dart';
+import '../l10n/generated/app_localizations.dart';
 
 /// In-app log viewer with copy/export/clear, mirroring the Android Logs screen.
 class LogsScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _export() async {
+    final l10n = AppLocalizations.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
@@ -35,7 +37,7 @@ class _LogsScreenState extends State<LogsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Log exported to ${file.path}'),
+          content: Text(l10n.logsExported(file.path)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -43,7 +45,7 @@ class _LogsScreenState extends State<LogsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Export failed: $e'),
+          content: Text(l10n.logsExportFailed('$e')),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
@@ -52,13 +54,14 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _copyAll() async {
+    final l10n = AppLocalizations.of(context);
     await Clipboard.setData(ClipboardData(text: AppLogger.exportAsText()));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Logs copied to the clipboard'),
+      SnackBar(
+        content: Text(l10n.logsCopiedToClipboard),
         behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -66,30 +69,33 @@ class _LogsScreenState extends State<LogsScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logs'),
+        title: Text(l10n.logsTitle),
         centerTitle: true,
         actions: [
           IconButton(
-            tooltip: _newestFirst ? 'Show oldest first' : 'Show newest first',
+            tooltip: _newestFirst
+                ? l10n.logsShowOldestFirst
+                : l10n.logsShowNewestFirst,
             icon: Icon(_newestFirst
                 ? Icons.arrow_downward
                 : Icons.arrow_upward),
             onPressed: () => setState(() => _newestFirst = !_newestFirst),
           ),
           IconButton(
-            tooltip: 'Copy all',
+            tooltip: l10n.logsCopyAll,
             icon: const Icon(Icons.copy_all_outlined),
             onPressed: _copyAll,
           ),
           IconButton(
-            tooltip: 'Export to file',
+            tooltip: l10n.logsExportToFile,
             icon: const Icon(Icons.download_outlined),
             onPressed: _export,
           ),
           IconButton(
-            tooltip: 'Clear',
+            tooltip: l10n.logsClear,
             icon: const Icon(Icons.delete_outline),
             onPressed: () {
               AppLogger.clear();
@@ -106,7 +112,7 @@ class _LogsScreenState extends State<LogsScreen> {
                 _newestFirst ? allEntries.reversed.toList() : allEntries;
             if (entries.isEmpty) {
               return Center(
-                child: Text('No log entries yet.',
+                child: Text(l10n.logsEmpty,
                     style: Theme.of(context)
                         .textTheme
                         .bodyMedium

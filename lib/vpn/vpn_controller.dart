@@ -68,8 +68,10 @@ int _proxyPassRenewalDelayMs(int? expiresAtEpochSeconds) {
   if (remainingMs <= 0) return _proxyPassRenewalFloorMs;
   final atHalfLife = (remainingMs * _proxyPassRenewalFraction).floor();
   final beforeExpiry = remainingMs - _proxyPassRenewalSafetyMarginMs;
-  return min(atHalfLife, beforeExpiry)
-      .clamp(_proxyPassRenewalFloorMs, _proxyPassRenewalCeilingMs);
+  return min(
+    atHalfLife,
+    beforeExpiry,
+  ).clamp(_proxyPassRenewalFloorMs, _proxyPassRenewalCeilingMs);
 }
 
 class _SupersededException implements Exception {
@@ -77,11 +79,28 @@ class _SupersededException implements Exception {
   String toString() => 'connect was superseded by a newer request';
 }
 
+enum VpnStatusKind {
+  disconnected,
+  connecting,
+  waitingForNetwork,
+  reconnecting,
+
+  /// [detail] is the exit country name.
+  connectedVpn,
+
+  /// [detail] is the local proxy bind address and port.
+  proxyActive,
+}
+
 /// Windows port of Android's `FoxyVpnService` orchestration: owns the local
 /// SOCKS5 frontend, the native tunnel process, the upstream HTTP/2 session,
 /// the watchdog, proxy-pass renewal, exit check and speed readout.
 class VpnController extends ChangeNotifier {
-  VpnController._();
+  VpnController._() {
+    SettingsStore.instance.localProxyEndpoint.addListener(
+      _onLocalProxyEndpointChanged,
+    );
+  }
 
   static final VpnController instance = VpnController._();
 
@@ -91,8 +110,14 @@ class VpnController extends ChangeNotifier {
   String? _lastError;
   String? get lastError => _lastError;
 
-  String _statusLabel = 'Disconnected';
-  String get statusLabel => _statusLabel;
+  VpnStatusKind _statusKind = VpnStatusKind.disconnected;
+  VpnStatusKind get statusKind => _statusKind;
+
+  String _statusDetail = '';
+
+  /// Extra information for the status line: the exit country when the tunnel
+  /// is up, the local proxy address in proxy-only mode, otherwise empty.
+  String get statusDetail => _statusDetail;
 
   int _downloadBytesPerSecond = 0;
   int get downloadBytesPerSecond => _downloadBytesPerSecond;
@@ -113,16 +138,23 @@ class VpnController extends ChangeNotifier {
   UpstreamSession? _upstreamSession;
   Timer? _speedTimer;
 
+  /// The endpoint [_socksServer] is meant to be listening on. Kept separate
+  /// from the server because the speed sampler holds the same instance and
+  /// Dart will not infer non-null from a boolean.
+  (String, int)? _localProxyEndpoint;
+
   int _lastUnhealthyRedialAt = 0;
 
   void _set({
     ConnectionState? state,
-    String? statusLabel,
+    VpnStatusKind? statusKind,
+    String? statusDetail,
     String? lastError,
     bool clearError = false,
   }) {
     if (state != null) _state = state;
-    if (statusLabel != null) _statusLabel = statusLabel;
+    if (statusKind != null) _statusKind = statusKind;
+    if (statusDetail != null) _statusDetail = statusDetail;
     if (clearError) {
       _lastError = null;
     } else if (lastError != null) {
@@ -145,7 +177,7 @@ class VpnController extends ChangeNotifier {
     }
     _set(
       state: ConnectionState.connecting,
-      statusLabel: 'Connecting…',
+      statusKind: VpnStatusKind.connecting,
       clearError: true,
     );
     try {
@@ -163,13 +195,113 @@ class VpnController extends ChangeNotifier {
     _speedTimer = null;
     _downloadBytesPerSecond = 0;
     _uploadBytesPerSecond = 0;
-    _set(state: ConnectionState.disconnected, statusLabel: 'Disconnected');
+    _set(
+      state: ConnectionState.disconnected,
+      statusKind: VpnStatusKind.disconnected,
+      statusDetail: '',
+    );
     if (idle) return;
     await _enqueue(() => _releaseResources(endedGeneration));
   }
 
   /// Called when the app window is closing so wintun routes are cleaned up.
   Future<void> shutdown() => disconnect('the application is exiting');
+
+  /// A Settings edit moved the local frontend's address or port. In
+  /// proxy-only mode rebind it live; in full-VPN mode
+  /// hev-socks5-tunnel was launched with the old port baked into its config,
+  /// so the change lands on the next connect.
+  void _onLocalProxyEndpointChanged() {
+    if (_state != ConnectionState.connected) return;
+    final endpoint = SettingsStore.instance.localProxyEndpoint.value;
+    if (_localProxyEndpoint == endpoint) return;
+    if (!SettingsStore.instance.proxyOnlyMode) {
+      AppLogger.i(
+        _tag,
+        'local proxy endpoint moved to ${endpoint.$1}:${endpoint.$2}; '
+        'full-VPN mode applies it on the next connect',
+      );
+      return;
+    }
+    unawaited(_enqueue(_rebindLocalProxy));
+  }
+
+  LocalSocks5Server _newLocalProxy(String bindAddress, int port) =>
+      LocalSocks5Server(
+        bindAddress: bindAddress,
+        port: port,
+        // Proxy-only mode runs no mapdns, so there are no fake IPs to reject.
+        rejectFakeDnsAddresses: false,
+        sessionProvider: () => _upstreamSession,
+        onSessionUnhealthy: _onUpstreamSessionUnhealthy,
+      );
+
+  Future<void> _rebindLocalProxy() async {
+    if (_state != ConnectionState.connected) return;
+    final settings = SettingsStore.instance;
+    final endpoint = settings.localProxyEndpoint.value;
+    final (address, port) = endpoint;
+    if (_localProxyEndpoint == endpoint) return;
+    AppLogger.i(_tag, 'rebinding the local proxy to $address:$port');
+
+    // Two listeners cannot share one port, so when only the address changes
+    // the old one must go first; otherwise bind the new listener before
+    // closing the old so a failed rebind never strands connected apps.
+    final movingToTheSamePort = _localProxyEndpoint?.$2 == port;
+    if (movingToTheSamePort) await _stopLocalProxy();
+
+    final replacement = _newLocalProxy(address, port);
+    try {
+      await replacement.start();
+    } catch (e) {
+      AppLogger.w(
+        _tag,
+        'the local proxy could not listen on $address:$port',
+        e,
+      );
+      if (movingToTheSamePort) {
+        // Nothing is listening now: put the previous endpoint back rather
+        // than leave already-configured apps with a dead port.
+        final (oldAddress, oldPort) = _localProxyEndpoint!;
+        final rollback = _newLocalProxy(oldAddress, oldPort);
+        try {
+          await rollback.start();
+          _socksServer = rollback;
+        } catch (_) {
+          _socksServer = null;
+        }
+      }
+      _set(
+        lastError:
+            'the local proxy could not listen on $address:$port — is that port '
+            'already taken?',
+      );
+      return;
+    }
+    if (!movingToTheSamePort) await _stopLocalProxy();
+    _socksServer = replacement;
+    _localProxyEndpoint = endpoint;
+
+    if (settings.systemProxyEnabled) {
+      await SystemProxyManager.instance.updateServer('127.0.0.1:$port');
+    }
+    _startSpeedUpdates(replacement);
+    _set(
+      statusKind: VpnStatusKind.proxyActive,
+      statusDetail: '$address:$port',
+      clearError: true,
+    );
+  }
+
+  Future<void> _stopLocalProxy() async {
+    final server = _socksServer;
+    if (server == null) return;
+    try {
+      await server.stop();
+    } catch (e) {
+      AppLogger.w(_tag, 'error stopping the previous local proxy', e);
+    }
+  }
 
   void _ensureGenerationCurrent(int myGeneration) {
     if (myGeneration != _generation) throw _SupersededException();
@@ -185,15 +317,19 @@ class VpnController extends ChangeNotifier {
     final now = DateTime.now().millisecondsSinceEpoch;
     final sinceLast = now - _lastUnhealthyRedialAt;
     if (_lastUnhealthyRedialAt != 0 && sinceLast < _unhealthyRedialCooldownMs) {
-      AppLogger.d(_tag,
-          'ignoring an unhealthy-session verdict ${sinceLast}ms after the '
-          'last rebuild (cooldown ${_unhealthyRedialCooldownMs}ms)');
+      AppLogger.d(
+        _tag,
+        'ignoring an unhealthy-session verdict ${sinceLast}ms after the '
+        'last rebuild (cooldown ${_unhealthyRedialCooldownMs}ms)',
+      );
       return;
     }
     _lastUnhealthyRedialAt = now;
-    AppLogger.w(_tag,
-        'the local proxy reports the upstream session is failing as a whole '
-        'rather than for one destination; closing it so the watchdog redials');
+    AppLogger.w(
+      _tag,
+      'the local proxy reports the upstream session is failing as a whole '
+      'rather than for one destination; closing it so the watchdog redials',
+    );
     try {
       session.close();
     } catch (e) {
@@ -217,21 +353,27 @@ class VpnController extends ChangeNotifier {
 
       // Built before anything hits the network: the server-list fetch and
       // every other control-plane call must chain through it too.
-      final upstreamProxyConfig = await _buildUpstreamProxyConfig(settingsStore);
+      final upstreamProxyConfig = await _buildUpstreamProxyConfig(
+        settingsStore,
+      );
       ControlPlaneHttp.useProxy(
         socks5: upstreamProxyConfig?.type == UpstreamProxyType.socks5,
         host: upstreamProxyConfig?.host ?? '',
         port: upstreamProxyConfig?.port ?? 0,
       );
       if (upstreamProxyConfig != null) {
-        AppLogger.i(_tag,
-            'control-plane requests will chain through the '
-            '${upstreamProxyConfig.type.name} proxy '
-            '${upstreamProxyConfig.address}');
+        AppLogger.i(
+          _tag,
+          'control-plane requests will chain through the '
+          '${upstreamProxyConfig.type.name} proxy '
+          '${upstreamProxyConfig.address}',
+        );
       }
 
-      final primaryCandidate =
-          await _resolveConnectCandidate(proxyStateStore, myGeneration);
+      final primaryCandidate = await _resolveConnectCandidate(
+        proxyStateStore,
+        myGeneration,
+      );
       _ensureGenerationCurrent(myGeneration);
 
       var candidates = <ProxyCandidate>[primaryCandidate];
@@ -245,28 +387,35 @@ class VpnController extends ChangeNotifier {
         if (candidateIndex + 1 >= candidates.length && !alternatesDiscovered) {
           alternatesDiscovered = true;
           final fresh = (await _discoverAlternateCandidates(primaryCandidate))
-              .where((discovered) => candidates
-                  .every((known) => known.authority != discovered.authority))
+              .where(
+                (discovered) => candidates.every(
+                  (known) => known.authority != discovered.authority,
+                ),
+              )
               .take(_maxAlternateEdges)
               .toList();
           if (fresh.isNotEmpty) {
             candidates = candidates + fresh;
-            AppLogger.i(_tag,
-                'found ${fresh.length} alternate edge(s) in '
-                '${primaryCandidate.countryCode} to fail over to');
+            AppLogger.i(
+              _tag,
+              'found ${fresh.length} alternate edge(s) in '
+              '${primaryCandidate.countryCode} to fail over to',
+            );
           }
         }
         if (candidateIndex + 1 >= candidates.length) return false;
         candidateIndex++;
-        AppLogger.i(_tag,
-            'failing over to edge ${activeCandidate().authority} '
-            '(${candidateIndex + 1} of ${candidates.length})');
+        AppLogger.i(
+          _tag,
+          'failing over to edge ${activeCandidate().authority} '
+          '(${candidateIndex + 1} of ${candidates.length})',
+        );
         return true;
       }
 
       final chainSuffix = upstreamProxyConfig != null
           ? ' via ${upstreamProxyConfig.type.name} proxy '
-              '${upstreamProxyConfig.address}'
+                '${upstreamProxyConfig.address}'
           : '';
 
       final customEdgeAddress = settingsStore.effectiveCustomEdgeAddress;
@@ -276,23 +425,30 @@ class VpnController extends ChangeNotifier {
 
       final dohEndpointAddresses = settingsStore.dohProvider.addresses;
 
-      AppLogger.i(_tag,
-          'connect: target=${primaryCandidate.authority} '
-          'country=${primaryCandidate.countryCode}$chainSuffix$edgeSuffix');
+      AppLogger.i(
+        _tag,
+        'connect: target=${primaryCandidate.authority} '
+        'country=${primaryCandidate.countryCode}$chainSuffix$edgeSuffix',
+      );
 
       final socksPort = settingsStore.socksPort;
       final socksBindAddress = settingsStore.socksBindAddress;
       final proxyOnlyMode = settingsStore.proxyOnlyMode;
       final customDnsServer = settingsStore.effectiveCustomDnsServer;
 
-      String connectedLabel() {
+      ({VpnStatusKind kind, String detail}) connectedLabel() {
         if (proxyOnlyMode) {
-          return 'Proxy active • $socksBindAddress:$socksPort';
+          // Read the live frontend: a Settings edit can rebind it to another
+          // address or port after this closure was created.
+          final (address, port) =
+              _localProxyEndpoint ?? (socksBindAddress, socksPort);
+          return (kind: VpnStatusKind.proxyActive, detail: '$address:$port');
         }
         final target = activeCandidate();
-        final country =
-            target.countryName.isNotEmpty ? target.countryName : target.countryCode;
-        return 'Connected • $country';
+        final country = target.countryName.isNotEmpty
+            ? target.countryName
+            : target.countryCode;
+        return (kind: VpnStatusKind.connectedVpn, detail: country);
       }
 
       final mapdnsActive = !proxyOnlyMode && customDnsServer == null;
@@ -305,6 +461,7 @@ class VpnController extends ChangeNotifier {
       );
       await socks.start();
       _socksServer = socks;
+      _localProxyEndpoint = (socksBindAddress, socks.boundPort);
 
       if (settingsStore.systemProxyEnabled) {
         // Windows' system proxy speaks HTTP only, which the local port
@@ -314,40 +471,55 @@ class VpnController extends ChangeNotifier {
       _ensureGenerationCurrent(myGeneration);
 
       if (proxyOnlyMode) {
-        AppLogger.i(_tag,
-            'connect: proxy-only mode enabled, skipping the wintun tunnel; '
-            'local proxy at $socksBindAddress:$socksPort');
+        AppLogger.i(
+          _tag,
+          'connect: proxy-only mode enabled, skipping the wintun tunnel; '
+          'local proxy at $socksBindAddress:$socksPort',
+        );
       } else {
         // Bypass routes must be installed BEFORE wintun takes the default
         // route: the app's own control-plane, edge and upstream-proxy dials
         // must leave through the physical gateway, not loop into the tunnel.
-        await RouteManager.instance.enable(extraBypassHosts: [
-          primaryCandidate.host,
-          ?customEdgeAddress,
-          if (upstreamProxyConfig != null) upstreamProxyConfig.host,
-        ]);
+        await RouteManager.instance.enable(
+          extraBypassHosts: [
+            primaryCandidate.host,
+            ?customEdgeAddress,
+            if (upstreamProxyConfig != null) upstreamProxyConfig.host,
+          ],
+        );
         _ensureGenerationCurrent(myGeneration);
 
-        final binary = HevSocks5Tunnel.findBinary(settingsStore.hevTunnelBinaryPath);
+        final binary = HevSocks5Tunnel.findBinary(
+          settingsStore.hevTunnelBinaryPath,
+        );
         if (binary == null) {
           throw StateError(
-              'hev-socks5-tunnel.exe was not found. Place it next to the app '
-              'executable or set its path in Settings.');
+            'hev-socks5-tunnel.exe was not found. Place it next to the app '
+            'executable or set its path in Settings.',
+          );
         }
         final configPath = await HevSocks5Tunnel.writeConfig(
-            Directory.systemTemp, socksPort, customDnsServer);
+          Directory.systemTemp,
+          socksPort,
+          customDnsServer,
+        );
         final started = await HevSocks5Tunnel.start(binary, configPath);
         if (!started) {
           throw StateError(
-              'Failed to start the tun2socks tunnel (hev-socks5-tunnel). '
-              'Run the app as administrator.');
+            'Failed to start the tun2socks tunnel (hev-socks5-tunnel). '
+            'Run the app as administrator.',
+          );
         }
         AppLogger.i(_tag, 'connect: wintun tunnel started');
-        await Future<void>.delayed(const Duration(milliseconds: _postTunSettleMs));
+        await Future<void>.delayed(
+          const Duration(milliseconds: _postTunSettleMs),
+        );
 
         // The engine creates the adapter but does not route or DNS into it;
         // the host side of the takeover lives in RouteManager.
-        await RouteManager.instance.takeoverRoutes(customDnsServer: customDnsServer);
+        await RouteManager.instance.takeoverRoutes(
+          customDnsServer: customDnsServer,
+        );
         _ensureGenerationCurrent(myGeneration);
       }
       _ensureGenerationCurrent(myGeneration);
@@ -362,21 +534,26 @@ class VpnController extends ChangeNotifier {
         _updateQuota(pass);
         final lifetimeNote = pass.expiresAtEpochSeconds != null
             ? ' (valid for '
-                '${(pass.expiresAtEpochSeconds! * 1000 - DateTime.now().millisecondsSinceEpoch) ~/ 1000}s)'
+                  '${(pass.expiresAtEpochSeconds! * 1000 - DateTime.now().millisecondsSinceEpoch) ~/ 1000}s)'
             : ' (lifetime not stated)';
         AppLogger.i(_tag, 'connect: acquired Guardian proxy pass$lifetimeNote');
 
-        var edgeAddress = customEdgeAddress ??
+        var edgeAddress =
+            customEdgeAddress ??
             await _resolveEdgeAddress(
-                target.host, upstreamProxyConfig, dohEndpointAddresses);
+              target.host,
+              upstreamProxyConfig,
+              dohEndpointAddresses,
+            );
 
         if (!proxyOnlyMode && upstreamProxyConfig == null) {
           // Under the tunnel the edge dial itself must bypass wintun and must
           // use a literal address: resolving by hostname would answer a
           // mapdns fake IP and loop the upstream connection back into the
           // tunnel.
-          final literal = await RouteManager.instance
-              .ensureBypassHost(edgeAddress ?? target.host);
+          final literal = await RouteManager.instance.ensureBypassHost(
+            edgeAddress ?? target.host,
+          );
           if (literal != null) edgeAddress = literal;
         }
 
@@ -384,8 +561,9 @@ class VpnController extends ChangeNotifier {
           // Under the tunnel the edge dial itself must bypass wintun, and a
           // hostname could resolve to a mapdns fake IP — force a real,
           // bypass-routed literal whenever one is discoverable.
-          final literal = await RouteManager.instance
-              .ensureBypassHost(edgeAddress ?? target.host);
+          final literal = await RouteManager.instance.ensureBypassHost(
+            edgeAddress ?? target.host,
+          );
           if (literal != null) edgeAddress = literal;
         }
 
@@ -404,8 +582,10 @@ class VpnController extends ChangeNotifier {
           } catch (_) {}
           rethrow;
         }
-        AppLogger.i(_tag,
-            'connect: upstream HTTP/2 tunnel established to ${target.authority}');
+        AppLogger.i(
+          _tag,
+          'connect: upstream HTTP/2 tunnel established to ${target.authority}',
+        );
         return session;
       }
 
@@ -421,13 +601,17 @@ class VpnController extends ChangeNotifier {
           session = await dialUpstream();
         } on TimeoutException catch (e) {
           lastDialFailure = e;
-          AppLogger.w(_tag,
-              'dial to ${target.authority} timed out (attempt $dialAttempt)');
+          AppLogger.w(
+            _tag,
+            'dial to ${target.authority} timed out (attempt $dialAttempt)',
+          );
         } catch (error) {
           if (_isFatalUpstreamError(error)) rethrow;
           lastDialFailure = error;
-          AppLogger.w(_tag,
-              'dial to ${target.authority} failed (attempt $dialAttempt): $error');
+          AppLogger.w(
+            _tag,
+            'dial to ${target.authority} failed (attempt $dialAttempt): $error',
+          );
         }
 
         if (session != null) {
@@ -439,11 +623,14 @@ class VpnController extends ChangeNotifier {
           }
           _upstreamSession = session;
           await Future<void>.delayed(
-              const Duration(milliseconds: _initialDialSettleMs));
+            const Duration(milliseconds: _initialDialSettleMs),
+          );
           if (_upstreamSession?.isConnected ?? false) break;
-          AppLogger.w(_tag,
-              'upstream tunnel to ${target.authority} died immediately after '
-              'connecting (attempt $dialAttempt/$_initialDialMaxAttempts)');
+          AppLogger.w(
+            _tag,
+            'upstream tunnel to ${target.authority} died immediately after '
+            'connecting (attempt $dialAttempt/$_initialDialMaxAttempts)',
+          );
           try {
             await _upstreamSession?.close();
           } catch (_) {}
@@ -454,25 +641,35 @@ class VpnController extends ChangeNotifier {
         if (dialAttempt >= _initialDialMaxAttempts) {
           final (failures, cleared) = proxyStateStore.recordFailure();
           if (cleared) {
-            AppLogger.w(_tag,
-                'the saved location failed $failures connects in a row; '
-                'clearing it so the next connect auto-selects a location');
+            AppLogger.w(
+              _tag,
+              'the saved location failed $failures connects in a row; '
+              'clearing it so the next connect auto-selects a location',
+            );
           }
           if (lastDialFailure != null) {
             throw StateError(
-                'Could not reach a VPN server after $dialAttempt attempts '
-                'across ${candidates.length} server(s). Last error: '
-                '${_friendlyErrorMessage(lastDialFailure)}');
+              'Could not reach a VPN server after $dialAttempt attempts '
+              'across ${candidates.length} server(s). Last error: '
+              '${_friendlyErrorMessage(lastDialFailure)}',
+            );
           }
           throw StateError(
-              'The VPN server closed the connection immediately, $dialAttempt '
-              'times in a row. Try again shortly or pick a different location.');
+            'The VPN server closed the connection immediately, $dialAttempt '
+            'times in a row. Try again shortly or pick a different location.',
+          );
         }
 
         await rotateCandidate();
-        await Future<void>.delayed(Duration(
-            milliseconds: _fullJitterBackoffMs(dialAttempt - 1,
-                _initialDialBackoffBaseMs, _initialDialBackoffCapMs)));
+        await Future<void>.delayed(
+          Duration(
+            milliseconds: _fullJitterBackoffMs(
+              dialAttempt - 1,
+              _initialDialBackoffBaseMs,
+              _initialDialBackoffCapMs,
+            ),
+          ),
+        );
       }
 
       _ensureGenerationCurrent(myGeneration);
@@ -482,10 +679,16 @@ class VpnController extends ChangeNotifier {
         proxyStateStore.save(primaryCandidate);
       }
 
-      final connectedText = connectedLabel();
-      _set(state: ConnectionState.connected, statusLabel: connectedText);
-      AppLogger.i(_tag,
-          'connect: CONNECTED via ${establishedCandidate.authority}');
+      final label = connectedLabel();
+      _set(
+        state: ConnectionState.connected,
+        statusKind: label.kind,
+        statusDetail: label.detail,
+      );
+      AppLogger.i(
+        _tag,
+        'connect: CONNECTED via ${establishedCandidate.authority}',
+      );
 
       unawaited(_proxyPassRenewalLoop(myGeneration, currentPassExpiry));
 
@@ -493,8 +696,10 @@ class VpnController extends ChangeNotifier {
         unawaited(() async {
           final session = _upstreamSession;
           if (session == null) return;
-          final observed = await ExitCheck()
-              .verifyExitCountry(session, establishedCandidate.countryCode);
+          final observed = await ExitCheck().verifyExitCountry(
+            session,
+            establishedCandidate.countryCode,
+          );
           if (observed != null && myGeneration == _generation) {
             AppLogger.i(_tag, 'exit check: observed country=$observed');
           }
@@ -505,10 +710,19 @@ class VpnController extends ChangeNotifier {
         _startSpeedUpdates(socks);
       }
 
-      unawaited(_watchdogLoop(myGeneration, dialUpstream, rotateCandidate,
-          connectedLabel));
+      unawaited(
+        _watchdogLoop(
+          myGeneration,
+          dialUpstream,
+          rotateCandidate,
+          connectedLabel,
+        ),
+      );
     } on _SupersededException {
-      AppLogger.i(_tag, 'connect: aborted because the connection was cancelled');
+      AppLogger.i(
+        _tag,
+        'connect: aborted because the connection was cancelled',
+      );
     } catch (failure) {
       if (_generation == myGeneration) {
         final message = failure is TimeoutException
@@ -528,22 +742,30 @@ class VpnController extends ChangeNotifier {
     _quotaMaxBytes = pass.quotaMax;
   }
 
-  Future<void> _proxyPassRenewalLoop(int myGeneration, int? initialExpiry) async {
+  Future<void> _proxyPassRenewalLoop(
+    int myGeneration,
+    int? initialExpiry,
+  ) async {
     var expiry = initialExpiry;
-    AppLogger.i(_tag,
-        'proxy pass renewal scheduled in '
-        '${_proxyPassRenewalDelayMs(expiry) ~/ 1000}s '
-        '${expiry == null ? "(pass lifetime unknown; using a fixed interval)" : "(at half of its remaining life)"}');
+    AppLogger.i(
+      _tag,
+      'proxy pass renewal scheduled in '
+      '${_proxyPassRenewalDelayMs(expiry) ~/ 1000}s '
+      '${expiry == null ? "(pass lifetime unknown; using a fixed interval)" : "(at half of its remaining life)"}',
+    );
     while (_generation == myGeneration) {
       await Future<void>.delayed(
-          Duration(milliseconds: _proxyPassRenewalDelayMs(expiry)));
+        Duration(milliseconds: _proxyPassRenewalDelayMs(expiry)),
+      );
       if (_generation != myGeneration) return;
 
       final session = _upstreamSession;
       if (session == null || !session.isConnected) {
-        AppLogger.d(_tag,
-            'skipping proxy pass renewal: no live session (the watchdog\'s '
-            'redial mints its own)');
+        AppLogger.d(
+          _tag,
+          'skipping proxy pass renewal: no live session (the watchdog\'s '
+          'redial mints its own)',
+        );
         continue;
       }
 
@@ -552,16 +774,22 @@ class VpnController extends ChangeNotifier {
         pass = await _mintProxyPass();
       } catch (error) {
         if (_isFatalUpstreamError(error)) {
-          AppLogger.e(_tag,
-              'proxy pass renewal failed for a reason retrying cannot fix; '
-              'leaving the session to the watchdog',
-              error);
+          AppLogger.e(
+            _tag,
+            'proxy pass renewal failed for a reason retrying cannot fix; '
+            'leaving the session to the watchdog',
+            error,
+          );
           return;
         }
-        AppLogger.w(_tag, 'proxy pass renewal failed; retrying shortly: $error');
+        AppLogger.w(
+          _tag,
+          'proxy pass renewal failed; retrying shortly: $error',
+        );
         expiry = null;
         await Future<void>.delayed(
-            const Duration(milliseconds: _proxyPassRenewalRetryMs));
+          const Duration(milliseconds: _proxyPassRenewalRetryMs),
+        );
         continue;
       }
 
@@ -570,20 +798,24 @@ class VpnController extends ChangeNotifier {
 
       final live = _upstreamSession;
       if (live == null || !live.isConnected) {
-        AppLogger.d(_tag,
-            'minted a fresh proxy pass but the session went down meanwhile; '
-            'the watchdog\'s redial will mint its own');
+        AppLogger.d(
+          _tag,
+          'minted a fresh proxy pass but the session went down meanwhile; '
+          'the watchdog\'s redial will mint its own',
+        );
         expiry = pass.expiresAtEpochSeconds;
         continue;
       }
 
       final lifetimeNote = pass.expiresAtEpochSeconds != null
           ? ' (valid for '
-              '${(pass.expiresAtEpochSeconds! * 1000 - DateTime.now().millisecondsSinceEpoch) ~/ 1000}s)'
+                '${(pass.expiresAtEpochSeconds! * 1000 - DateTime.now().millisecondsSinceEpoch) ~/ 1000}s)'
           : ' (lifetime not stated)';
       live.updateBearerToken(pass.token);
-      AppLogger.i(_tag,
-          'proxy pass renewed in place$lifetimeNote; the tunnel was not rebuilt');
+      AppLogger.i(
+        _tag,
+        'proxy pass renewed in place$lifetimeNote; the tunnel was not rebuilt',
+      );
       expiry = pass.expiresAtEpochSeconds;
       notifyListeners();
     }
@@ -593,7 +825,7 @@ class VpnController extends ChangeNotifier {
     int myGeneration,
     Future<H2UpstreamSession> Function() dialUpstream,
     Future<bool> Function() rotateCandidate,
-    String Function() connectedLabel,
+    ({VpnStatusKind kind, String detail}) Function() connectedLabel,
   ) async {
     var consecutiveFailures = 0;
     var waitingForNetwork = false;
@@ -606,7 +838,12 @@ class VpnController extends ChangeNotifier {
       if (current != null && current.isConnected) {
         if (consecutiveFailures > 0 || waitingForNetwork) {
           AppLogger.i(_tag, 'upstream tunnel is healthy again');
-          _set(statusLabel: connectedLabel(), clearError: true);
+          final label = connectedLabel();
+          _set(
+            statusKind: label.kind,
+            statusDetail: label.detail,
+            clearError: true,
+          );
         }
         consecutiveFailures = 0;
         waitingForNetwork = false;
@@ -615,10 +852,12 @@ class VpnController extends ChangeNotifier {
 
       if (!await _hasUsableNetwork()) {
         if (!waitingForNetwork) {
-          AppLogger.i(_tag,
-              'no usable network; holding the session and waiting for connectivity');
+          AppLogger.i(
+            _tag,
+            'no usable network; holding the session and waiting for connectivity',
+          );
           waitingForNetwork = true;
-          _set(statusLabel: 'Waiting for network…');
+          _set(statusKind: VpnStatusKind.waitingForNetwork);
         }
         consecutiveFailures = 0;
         continue;
@@ -632,29 +871,39 @@ class VpnController extends ChangeNotifier {
       try {
         await current?.close();
       } catch (_) {}
-      _set(statusLabel: 'Reconnecting…');
+      _set(statusKind: VpnStatusKind.reconnecting);
 
       H2UpstreamSession? fresh;
       try {
         fresh = await dialUpstream();
       } on TimeoutException {
         consecutiveFailures++;
-        AppLogger.w(_tag,
-            'upstream reconnect attempt $consecutiveFailures timed out');
+        AppLogger.w(
+          _tag,
+          'upstream reconnect attempt $consecutiveFailures timed out',
+        );
       } catch (error) {
         if (_isFatalUpstreamError(error)) {
-          AppLogger.e(_tag,
-              'unrecoverable upstream failure; disconnecting: '
-              '${_friendlyErrorMessage(error)}');
+          AppLogger.e(
+            _tag,
+            'unrecoverable upstream failure; disconnecting: '
+            '${_friendlyErrorMessage(error)}',
+          );
           _lastError = _friendlyErrorMessage(error);
           ++_generation;
           await _releaseResources(myGeneration);
-          _set(state: ConnectionState.disconnected, statusLabel: 'Disconnected');
+          _set(
+            state: ConnectionState.disconnected,
+            statusKind: VpnStatusKind.disconnected,
+            statusDetail: '',
+          );
           return;
         }
         consecutiveFailures++;
-        AppLogger.w(_tag,
-            'upstream reconnect attempt $consecutiveFailures failed: $error');
+        AppLogger.w(
+          _tag,
+          'upstream reconnect attempt $consecutiveFailures failed: $error',
+        );
       }
 
       if (fresh == null) {
@@ -663,22 +912,33 @@ class VpnController extends ChangeNotifier {
         }
         if (consecutiveFailures == _reconnectFailuresBeforeWarning) {
           _set(
-              lastError:
-                  'Still trying to reconnect to the VPN server. Use Disconnect to stop.');
-          AppLogger.e(_tag,
-              '$consecutiveFailures consecutive reconnect failures; continuing '
-              'to retry with backoff (capped at '
-              '${_reconnectBackoffCapMs ~/ 1000}s between attempts)');
+            lastError:
+                'Still trying to reconnect to the VPN server. Use Disconnect to stop.',
+          );
+          AppLogger.e(
+            _tag,
+            '$consecutiveFailures consecutive reconnect failures; continuing '
+            'to retry with backoff (capped at '
+            '${_reconnectBackoffCapMs ~/ 1000}s between attempts)',
+          );
         }
-        await Future<void>.delayed(Duration(
-            milliseconds: _fullJitterBackoffMs(consecutiveFailures - 1,
-                _reconnectBackoffBaseMs, _reconnectBackoffCapMs)));
+        await Future<void>.delayed(
+          Duration(
+            milliseconds: _fullJitterBackoffMs(
+              consecutiveFailures - 1,
+              _reconnectBackoffBaseMs,
+              _reconnectBackoffCapMs,
+            ),
+          ),
+        );
         continue;
       }
 
       if (_generation != myGeneration) {
-        AppLogger.i(_tag,
-            'discarding stale reconnect from a torn-down session generation');
+        AppLogger.i(
+          _tag,
+          'discarding stale reconnect from a torn-down session generation',
+        );
         try {
           await fresh.close();
         } catch (_) {}
@@ -686,7 +946,12 @@ class VpnController extends ChangeNotifier {
       }
       _upstreamSession = fresh;
       consecutiveFailures = 0;
-      _set(statusLabel: connectedLabel(), clearError: true);
+      final label = connectedLabel();
+      _set(
+        statusKind: label.kind,
+        statusDetail: label.detail,
+        clearError: true,
+      );
       AppLogger.i(_tag, 'upstream tunnel reconnected');
 
       unawaited(_proxyPassRenewalLoop(myGeneration, _currentPassExpiry));
@@ -695,8 +960,9 @@ class VpnController extends ChangeNotifier {
 
   Future<bool> _hasUsableNetwork() async {
     try {
-      await InternetAddress.lookup(RouteManager.controlPlaneHosts.first)
-          .timeout(const Duration(seconds: 3));
+      await InternetAddress.lookup(
+        RouteManager.controlPlaneHosts.first,
+      ).timeout(const Duration(seconds: 3));
       return true;
     } on SocketException {
       return false;
@@ -713,18 +979,20 @@ class VpnController extends ChangeNotifier {
     var lastUpload = socks.uploadBytes;
     var lastSampleAt = DateTime.now().millisecondsSinceEpoch;
     _speedTimer = Timer.periodic(
-        const Duration(milliseconds: _speedUpdateIntervalMs), (_) {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final elapsedSeconds = max(now - lastSampleAt, 1) / 1000.0;
-      _downloadBytesPerSecond =
-          max(socks.downloadBytes - lastDownload, 0) ~/ elapsedSeconds;
-      _uploadBytesPerSecond =
-          max(socks.uploadBytes - lastUpload, 0) ~/ elapsedSeconds;
-      lastDownload = socks.downloadBytes;
-      lastUpload = socks.uploadBytes;
-      lastSampleAt = now;
-      if (_state == ConnectionState.connected) notifyListeners();
-    });
+      const Duration(milliseconds: _speedUpdateIntervalMs),
+      (_) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final elapsedSeconds = max(now - lastSampleAt, 1) / 1000.0;
+        _downloadBytesPerSecond =
+            max(socks.downloadBytes - lastDownload, 0) ~/ elapsedSeconds;
+        _uploadBytesPerSecond =
+            max(socks.uploadBytes - lastUpload, 0) ~/ elapsedSeconds;
+        lastDownload = socks.downloadBytes;
+        lastUpload = socks.uploadBytes;
+        lastSampleAt = now;
+        if (_state == ConnectionState.connected) notifyListeners();
+      },
+    );
   }
 
   Future<ProxyPass> _mintProxyPass() async {
@@ -733,52 +1001,70 @@ class VpnController extends ChangeNotifier {
     if (auth == null) throw TokenInvalidError('Not signed in');
 
     if (!tokenStore.hasValidAccessToken()) {
-      final renewed =
-          await FxaAuthRepository(tokenStore).refreshAccessToken();
+      final renewed = await FxaAuthRepository(tokenStore).refreshAccessToken();
       if (renewed != null) {
         auth = renewed;
-        AppLogger.i(_tag, "the account's access token had expired and was renewed");
+        AppLogger.i(
+          _tag,
+          "the account's access token had expired and was renewed",
+        );
       } else {
-        AppLogger.w(_tag,
-            "the account's access token is past its expiry and could not be "
-            'renewed automatically; you may need to sign in again');
+        AppLogger.w(
+          _tag,
+          "the account's access token is past its expiry and could not be "
+          'renewed automatically; you may need to sign in again',
+        );
       }
     }
     final guardian = GuardianClient();
     try {
       return await guardian.fetchProxyPass(
-          guardianEndpointDefault, auth.accessToken);
+        guardianEndpointDefault,
+        auth.accessToken,
+      );
     } on TokenInvalidError catch (invalid) {
-      AppLogger.w(_tag,
-          'proxy pass rejected, activating Guardian entitlement and retrying',
-          invalid);
+      AppLogger.w(
+        _tag,
+        'proxy pass rejected, activating Guardian entitlement and retrying',
+        invalid,
+      );
       await guardian.activateGuardian(
-          guardianEndpointDefault, auth.accessToken);
-      return guardian.fetchProxyPass(
-          guardianEndpointDefault, auth.accessToken);
+        guardianEndpointDefault,
+        auth.accessToken,
+      );
+      return guardian.fetchProxyPass(guardianEndpointDefault, auth.accessToken);
     }
   }
 
   Future<ProxyCandidate> _resolveConnectCandidate(
-      ProxyStateStore proxyStateStore, int myGeneration) async {
+    ProxyStateStore proxyStateStore,
+    int myGeneration,
+  ) async {
     final saved = proxyStateStore.load();
     if (saved != null) return saved;
-    AppLogger.i(_tag,
-        'connect: no server previously selected; auto-selecting recommended location');
-    final countries = await ServerListClient()
-        .fetchCountries()
-        .timeout(_serverListFetchTimeout);
+    AppLogger.i(
+      _tag,
+      'connect: no server previously selected; auto-selecting recommended location',
+    );
+    final countries = await ServerListClient().fetchCountries().timeout(
+      _serverListFetchTimeout,
+    );
     _ensureGenerationCurrent(myGeneration);
     final random = Random();
-    final recommended =
-        ServerListClient.candidatesForCountry(countries, recommendedCountryCode);
+    final recommended = ServerListClient.candidatesForCountry(
+      countries,
+      recommendedCountryCode,
+    );
     var chosen = recommended.isNotEmpty
         ? recommended[random.nextInt(recommended.length)]
         : null;
     if (chosen == null) {
       for (final country in countries) {
         if (country.code.isEmpty) continue;
-        final pool = ServerListClient.candidatesForCountry(countries, country.code);
+        final pool = ServerListClient.candidatesForCountry(
+          countries,
+          country.code,
+        );
         if (pool.isNotEmpty) {
           chosen = pool[random.nextInt(pool.length)];
           break;
@@ -787,32 +1073,45 @@ class VpnController extends ChangeNotifier {
     }
     if (chosen == null) {
       throw StateError(
-          'No server selected and no servers are available. Choose a location first.');
+        'No server selected and no servers are available. Choose a location first.',
+      );
     }
     proxyStateStore.save(chosen);
-    AppLogger.i(_tag,
-        'connect: auto-selected ${chosen.authority} country=${chosen.countryCode}');
+    AppLogger.i(
+      _tag,
+      'connect: auto-selected ${chosen.authority} country=${chosen.countryCode}',
+    );
     return chosen;
   }
 
   Future<List<ProxyCandidate>> _discoverAlternateCandidates(
-      ProxyCandidate primary) async {
+    ProxyCandidate primary,
+  ) async {
     try {
-      final countries = await ServerListClient()
-          .fetchCountries()
-          .timeout(_serverListFetchTimeout);
+      final countries = await ServerListClient().fetchCountries().timeout(
+        _serverListFetchTimeout,
+      );
       final sameCity = ServerListClient.candidatesForCity(
-          countries, primary.countryCode, primary.cityCode);
-      final sameCountry =
-          ServerListClient.candidatesForCountry(countries, primary.countryCode);
+        countries,
+        primary.countryCode,
+        primary.cityCode,
+      );
+      final sameCountry = ServerListClient.candidatesForCountry(
+        countries,
+        primary.countryCode,
+      );
       final seen = <String>{};
       return [...sameCity, ...sameCountry]
-          .where((c) => c.authority != primary.authority && seen.add(c.authority))
+          .where(
+            (c) => c.authority != primary.authority && seen.add(c.authority),
+          )
           .toList();
     } catch (failure) {
-      AppLogger.w(_tag,
-          'could not fetch alternate edges; staying with ${primary.authority}',
-          failure);
+      AppLogger.w(
+        _tag,
+        'could not fetch alternate edges; staying with ${primary.authority}',
+        failure,
+      );
       return [];
     }
   }
@@ -828,7 +1127,8 @@ class VpnController extends ChangeNotifier {
   }
 
   Future<UpstreamProxyConfig?> _buildUpstreamProxyConfig(
-      SettingsStore settingsStore) async {
+    SettingsStore settingsStore,
+  ) async {
     if (!settingsStore.upstreamProxyEnabled ||
         settingsStore.upstreamProxyHost.trim().isEmpty) {
       return null;
@@ -863,7 +1163,11 @@ class VpnController extends ChangeNotifier {
     _downloadBytesPerSecond = 0;
     _uploadBytesPerSecond = 0;
     await _releaseResources(endedGeneration);
-    _set(state: ConnectionState.disconnected, statusLabel: 'Disconnected');
+    _set(
+      state: ConnectionState.disconnected,
+      statusKind: VpnStatusKind.disconnected,
+      statusDetail: '',
+    );
   }
 
   /// Stops the native tunnel, removes bypass routes, closes the SOCKS
@@ -873,11 +1177,13 @@ class VpnController extends ChangeNotifier {
 
     final socks = _socksServer;
     _socksServer = null;
+    _localProxyEndpoint = null;
     final session = _upstreamSession;
     _upstreamSession = null;
 
     // Only stop the OS-level pieces if no newer connect took over meanwhile.
-    final stillOurs = _generation == endedGeneration ||
+    final stillOurs =
+        _generation == endedGeneration ||
         _state == ConnectionState.disconnected;
 
     if (session != null) {

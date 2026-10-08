@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/fxa_auth_repository.dart';
 import '../data/token_store.dart';
+import '../l10n/generated/app_localizations.dart';
 
 /// Firefox Accounts sign-in: email + password, then an email-2FA code step
 /// when the account requires it.
@@ -84,6 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -107,8 +109,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 4),
                   Text(
                     _twoFactorStep
-                        ? 'Enter the verification code sent to your email'
-                        : 'Sign in with your Firefox Account',
+                        ? l10n.loginTwoFactorSubtitle
+                        : l10n.loginSubtitle,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: scheme.onSurfaceVariant,
@@ -120,13 +122,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.alternate_email),
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.loginEmailLabel,
+                        prefixIcon: const Icon(Icons.alternate_email),
+                        border: const OutlineInputBorder(),
                       ),
                       validator: (v) => (v == null || !v.contains('@'))
-                          ? 'Enter a valid email address'
+                          ? l10n.loginEmailInvalid
                           : null,
                     ),
                     const SizedBox(height: 14),
@@ -136,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       autofillHints: const [AutofillHints.password],
                       onFieldSubmitted: (_) => _busy ? null : _signIn(),
                       decoration: InputDecoration(
-                        labelText: 'Password',
+                        labelText: l10n.loginPasswordLabel,
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
@@ -147,8 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Enter your password' : null,
+                      validator: (v) => (v == null || v.isEmpty)
+                          ? l10n.loginPasswordRequired
+                          : null,
                     ),
                   ] else ...[
                     TextFormField(
@@ -156,10 +159,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.number,
                       autofocus: true,
                       onFieldSubmitted: (_) => _busy ? null : _submitCode(),
-                      decoration: const InputDecoration(
-                        labelText: 'Verification code',
-                        prefixIcon: Icon(Icons.pin_outlined),
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.loginCodeLabel,
+                        prefixIcon: const Icon(Icons.pin_outlined),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ],
@@ -185,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 22,
                             child: CircularProgressIndicator(strokeWidth: 2.5),
                           )
-                        : Text(_twoFactorStep ? 'Verify' : 'Sign in'),
+                        : Text(_twoFactorStep ? l10n.loginVerify : l10n.loginSignIn),
                   ),
                   if (_twoFactorStep) ...[
                     const SizedBox(height: 10),
@@ -196,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _twoFactorStep = false;
                                 _error = null;
                               }),
-                      child: const Text('Back to sign-in'),
+                      child: Text(l10n.loginBackToSignIn),
                     ),
                   ],
                 ],

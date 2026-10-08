@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fluttewind/vpn/local_socks5_server.dart';
-import 'package:fluttewind/vpn/upstream_session.dart';
+import 'package:foxyvpn/vpn/local_socks5_server.dart';
+import 'package:foxyvpn/vpn/upstream_session.dart';
 
 class _FakeStream {
   _FakeStream(this.host, this.port) {

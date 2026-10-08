@@ -11,10 +11,15 @@ const String _registryKey =
 const int _internetOptionSettingsChanged = 39;
 const int _internetOptionRefresh = 37;
 
-typedef _InternetSetOptionNative = Int32 Function(
-    IntPtr handle, Uint32 option, IntPtr buffered, Uint32 length);
-typedef _InternetSetOptionDart = int Function(
-    int handle, int option, int buffered, int length);
+typedef _InternetSetOptionNative =
+    Int32 Function(
+      IntPtr handle,
+      Uint32 option,
+      IntPtr buffered,
+      Uint32 length,
+    );
+typedef _InternetSetOptionDart =
+    int Function(int handle, int option, int buffered, int length);
 
 /// Reads and writes the Windows *system* proxy (the Internet Settings
 /// registry values every WinINET/WinHTTP app and browser honours), then
@@ -39,6 +44,16 @@ class SystemProxyManager {
     _notify();
     _applied = true;
     AppLogger.i(_tag, 'Windows system proxy enabled -> $server');
+  }
+
+  /// Repoints an already-applied system proxy at a new address (the local
+  /// frontend rebound to another port). The saved pre-connect state stays as
+  /// it is, so [restore] still puts back what the user originally had.
+  Future<void> updateServer(String server) async {
+    if (!_applied) return apply(server);
+    await _setValue('ProxyServer', 'REG_SZ', server);
+    _notify();
+    AppLogger.i(_tag, 'Windows system proxy moved -> $server');
   }
 
   Future<void> restore() async {
@@ -92,13 +107,20 @@ class SystemProxyManager {
     return (candidate.substring(0, colon), port);
   }
 
-  static Future<void> _restoreValue(String name, String? saved,
-      {String type = 'REG_SZ'}) async {
+  static Future<void> _restoreValue(
+    String name,
+    String? saved, {
+    String type = 'REG_SZ',
+  }) async {
     if (saved == null) {
       try {
-        await Process.run(
-            'reg', ['delete', _registryKey, '/v', name, '/f'],
-            runInShell: true);
+        await Process.run('reg', [
+          'delete',
+          _registryKey,
+          '/v',
+          name,
+          '/f',
+        ], runInShell: true);
       } catch (e) {
         AppLogger.w(_tag, 'could not remove $name', e);
       }
@@ -109,9 +131,12 @@ class SystemProxyManager {
 
   static Future<String?> _query(String name) async {
     try {
-      final result = await Process.run(
-          'reg', ['query', _registryKey, '/v', name],
-          runInShell: true);
+      final result = await Process.run('reg', [
+        'query',
+        _registryKey,
+        '/v',
+        name,
+      ], runInShell: true);
       if (result.exitCode != 0) return null;
       for (final rawLine in (result.stdout as String).split('\n')) {
         final line = rawLine.trim();
@@ -130,12 +155,22 @@ class SystemProxyManager {
 
   static Future<void> _setValue(String name, String type, String data) async {
     try {
-      final result = await Process.run(
-          'reg', ['add', _registryKey, '/v', name, '/t', type, '/d', data, '/f'],
-          runInShell: true);
+      final result = await Process.run('reg', [
+        'add',
+        _registryKey,
+        '/v',
+        name,
+        '/t',
+        type,
+        '/d',
+        data,
+        '/f',
+      ], runInShell: true);
       if (result.exitCode != 0) {
-        AppLogger.w(_tag,
-            'reg add $name failed: ${(result.stderr as String).trim()}');
+        AppLogger.w(
+          _tag,
+          'reg add $name failed: ${(result.stderr as String).trim()}',
+        );
       }
     } catch (e) {
       AppLogger.w(_tag, 'could not write $name to the registry', e);
@@ -147,14 +182,17 @@ class SystemProxyManager {
       final wininet = DynamicLibrary.open('wininet.dll');
       final setOption = wininet
           .lookupFunction<_InternetSetOptionNative, _InternetSetOptionDart>(
-              'InternetSetOptionW');
+            'InternetSetOptionW',
+          );
       setOption(0, _internetOptionSettingsChanged, 0, 0);
       setOption(0, _internetOptionRefresh, 0, 0);
     } catch (e) {
-      AppLogger.w(_tag,
-          'the registry was updated but running apps were not notified; they '
-          'will pick the change up when restarted',
-          e);
+      AppLogger.w(
+        _tag,
+        'the registry was updated but running apps were not notified; they '
+        'will pick the change up when restarted',
+        e,
+      );
     }
   }
 
@@ -165,7 +203,8 @@ class SystemProxyManager {
       final wininet = DynamicLibrary.open('wininet.dll');
       final setOption = wininet
           .lookupFunction<_InternetSetOptionNative, _InternetSetOptionDart>(
-              'InternetSetOptionW');
+            'InternetSetOptionW',
+          );
       final a = setOption(0, _internetOptionSettingsChanged, 0, 0);
       final b = setOption(0, _internetOptionRefresh, 0, 0);
       return a == 1 && b == 1;

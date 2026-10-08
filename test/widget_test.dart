@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fluttewind/data/models.dart';
+import 'package:foxyvpn/data/models.dart';
 
 void main() {
   test('ProxyCandidate JSON round-trips', () {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fluttewind/vpn/system_proxy_manager.dart';
+import 'package:foxyvpn/vpn/system_proxy_manager.dart';
 
 void main() {
   group('ProxyServer registry value parsing', () {

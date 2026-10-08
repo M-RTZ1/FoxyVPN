@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "fluttewind" "\0"
+            VALUE "CompanyName", "M-RTZ1" "\0"
+            VALUE "FileDescription", "FoxyVPN for Windows" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "fluttewind" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "fluttewind.exe" "\0"
-            VALUE "ProductName", "fluttewind" "\0"
+            VALUE "InternalName", "FoxyVPN" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 M-RTZ1. MIT licensed." "\0"
+            VALUE "OriginalFilename", "FoxyVPN.exe" "\0"
+            VALUE "ProductName", "FoxyVPN" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

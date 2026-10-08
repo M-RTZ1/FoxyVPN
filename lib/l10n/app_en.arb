@@ -1,0 +1,175 @@
+{
+  "@@locale": "en",
+
+  "navHome": "Home",
+  "navServers": "Servers",
+  "navSettings": "Settings",
+  "navLogs": "Logs",
+
+  "actionCancel": "Cancel",
+  "actionSignOut": "Sign out",
+  "signOutDialogTitle": "Sign out?",
+  "signOutDialogBody": "The tunnel will be disconnected and your Firefox Account session removed from this device.",
+
+  "statusDisconnected": "Disconnected",
+  "statusConnecting": "Connecting…",
+  "statusWaitingForNetwork": "Waiting for network…",
+  "statusReconnecting": "Reconnecting…",
+  "statusConnectedVpn": "Connected • {country}",
+  "@statusConnectedVpn": {
+    "placeholders": { "country": { "type": "String" } }
+  },
+  "statusProxyActive": "Proxy active • {address}",
+  "@statusProxyActive": {
+    "placeholders": { "address": { "type": "String" } }
+  },
+
+  "homeEstablishingTunnel": "Establishing the tunnel…",
+  "homeTrafficUnprotected": "Your traffic is not protected",
+  "statDownload": "Download",
+  "statUpload": "Upload",
+  "quotaPending": "Quota information appears once the tunnel connects.",
+  "quotaLeftOf": "{remaining} left of {max}",
+  "@quotaLeftOf": {
+    "placeholders": { "remaining": { "type": "String" }, "max": { "type": "String" } }
+  },
+  "quotaLeft": "{remaining} left",
+  "@quotaLeft": {
+    "placeholders": { "remaining": { "type": "String" } }
+  },
+  "autoSelectedLocation": "Auto-selected location",
+  "exitLocation": "Exit location: {location}",
+  "@exitLocation": {
+    "placeholders": { "location": { "type": "String" } }
+  },
+  "serverCardRecommended": "Recommended (automatic)",
+  "serverCardPickLocation": "Pick a location on the Servers tab",
+
+  "loginSubtitle": "Sign in with your Firefox Account",
+  "loginTwoFactorSubtitle": "Enter the verification code sent to your email",
+  "loginEmailLabel": "Email",
+  "loginPasswordLabel": "Password",
+  "loginCodeLabel": "Verification code",
+  "loginEmailInvalid": "Enter a valid email address",
+  "loginPasswordRequired": "Enter your password",
+  "loginSignIn": "Sign in",
+  "loginVerify": "Verify",
+  "loginBackToSignIn": "Back to sign-in",
+
+  "serversTitle": "Locations",
+  "serversReload": "Reload",
+  "serversRecommended": "Recommended for you",
+  "serversRecommendedSubtitle": "Choose automatically from the fastest available country",
+  "serversAutoChosen": "Location will be chosen automatically",
+  "serversLocationSet": "Location set to {country} ({authority})",
+  "@serversLocationSet": {
+    "placeholders": { "country": { "type": "String" }, "authority": { "type": "String" } }
+  },
+  "serversLoadFailed": "Could not load the server list: {error}",
+  "@serversLoadFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "serversNoneAvailable": "No locations are available right now.",
+  "serversNoServers": "No usable servers in this country.",
+  "serversCityCount": "{count} city(ies)",
+  "@serversCityCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "serversPort": "port {port}",
+  "@serversPort": {
+    "placeholders": { "port": { "type": "int" } }
+  },
+  "serversTryAgain": "Try again",
+
+  "sectionAppearance": "Appearance",
+  "sectionLanguage": "Language",
+  "sectionConnection": "Connection",
+  "sectionLocalProxy": "Local proxy (SOCKS5 + HTTP)",
+  "sectionUpstreamProxy": "Chain through an upstream proxy",
+  "sectionTunnelEngine": "Tunnel engine",
+  "sectionAbout": "About",
+
+  "themeAuto": "Auto",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "languageSystem": "Auto",
+  "languageEnglish": "English",
+  "languagePersian": "فارسی",
+
+  "exitCheckTitle": "Exit check",
+  "exitCheckSubtitle": "Verify the exit country after connecting and log a warning on mismatch",
+  "proxyOnlyTitle": "Proxy-only mode",
+  "proxyOnlySubtitle": "Expose only the local proxy; no wintun adapter, no admin rights needed",
+  "systemProxyTitle": "Set as Windows system proxy",
+  "systemProxySubtitle": "While connected, point Windows (and every app that honours it) at the local HTTP proxy; reverted on disconnect",
+  "dohTitle": "DNS-over-HTTPS resolver (for edge resolution)",
+  "customDnsTitle": "Custom DNS server for the tunnel",
+  "customDnsSubtitle": "When on, the TUN interface hands this resolver to apps instead of on-device fake-DNS",
+  "customDnsLabel": "Custom DNS server (IPv4)",
+  "customDnsHelper": "e.g. 1.1.1.1",
+  "errorInvalidDns": "Invalid DNS server address",
+  "pinnedEdgeLabel": "Pinned edge address (optional)",
+  "pinnedEdgeHelper": "Force every connection to dial this Fastly edge IP",
+  "errorInvalidHostOrIp": "Invalid hostname or IP address",
+  "bindAddressLabel": "Bind address",
+  "localProxyApplyHint": "Applies at once in proxy-only mode; in full-VPN mode it takes effect on the next connect",
+  "errorInvalidIp": "Invalid IP address",
+  "portLabel": "Port",
+  "errorInvalidPort": "Invalid port number",
+  "upstreamTitle": "Use an upstream proxy",
+  "upstreamSubtitle": "Route everything (sign-in, Guardian, server list and the edge dials) through a SOCKS5 or HTTP proxy; credentials apply to the edge connection",
+  "proxyTypeLabel": "Proxy type",
+  "proxyTypeHttp": "HTTP (CONNECT)",
+  "proxyHostLabel": "Proxy host",
+  "proxyPortLabel": "Proxy port",
+  "copyFromSystemProxy": "Copy from Windows system proxy",
+  "noSystemProxyConfigured": "Windows has no system proxy configured",
+  "unparsableSystemProxy": "Could not understand the Windows proxy setting: {value}",
+  "@unparsableSystemProxy": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "proxyUsernameLabel": "Proxy username (optional)",
+  "proxyPasswordLabel": "Proxy password (optional)",
+  "saveCredentials": "Save credentials",
+  "credentialsSaved": "Proxy credentials saved",
+  "tunnelPathLabel": "hev-socks5-tunnel.exe path",
+  "tunnelPathHelper": "Leave empty to look next to the app executable (or in bin\\). Required for full-VPN mode; proxy-only mode does not need it.",
+  "aboutBody": "FoxyVPN for Windows • traffic rides HTTP/2 CONNECT streams through Fastly edges using your Mozilla VPN entitlement (50 GB/month free).\n\nFull-VPN mode creates a wintun adapter and needs the app to run as administrator.",
+  "aboutSource": "Source: github.com/M-RTZ1/FoxyVPN",
+  "copySourceUrl": "Copy the project source URL",
+  "sourceUrlCopied": "Source URL copied",
+
+  "logsTitle": "Logs",
+  "logsShowOldestFirst": "Show oldest first",
+  "logsShowNewestFirst": "Show newest first",
+  "logsCopyAll": "Copy all",
+  "logsExportToFile": "Export to file",
+  "logsClear": "Clear",
+  "logsEmpty": "No log entries yet.",
+  "logsCopiedToClipboard": "Logs copied to the clipboard",
+  "logsExported": "Log exported to {path}",
+  "@logsExported": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "logsExportFailed": "Export failed: {error}",
+  "@logsExportFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "aboutVersion": "Version {version}",
+  "@aboutVersion": {"placeholders": {"version": {"type": "String"}}},
+  "updateCheckAction": "Check for updates",
+  "updateChecking": "Checking GitHub…",
+  "updateUpToDate": "You are on the newest release ({version})",
+  "@updateUpToDate": {"placeholders": {"version": {"type": "String"}}},
+  "updateNonePublished": "No release has been published on GitHub yet",
+  "updateFailed": "The update check failed: {error}",
+  "@updateFailed": {"placeholders": {"error": {"type": "String"}}},
+  "updateAvailableTitle": "FoxyVPN {latest} is available",
+  "@updateAvailableTitle": {"placeholders": {"latest": {"type": "String"}}},
+  "updateAvailableBody": "You are running version {current}. Download the new build from its GitHub release.",
+  "@updateAvailableBody": {"placeholders": {"current": {"type": "String"}}},
+  "updateActionDownload": "Download {asset}",
+  "@updateActionDownload": {"placeholders": {"asset": {"type": "String"}}},
+  "updateActionOpenRelease": "Open the release page",
+  "updateActionNotNow": "Not now"
+}

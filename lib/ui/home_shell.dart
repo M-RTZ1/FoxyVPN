@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
 import 'home_screen.dart';
 import 'logs_screen.dart';
 import 'server_list_screen.dart';
@@ -27,6 +28,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: NavigationBar(
@@ -34,26 +36,26 @@ class _HomeShellState extends State<HomeShell> {
         height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         onDestinationSelected: (index) => setState(() => _index = index),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.power_settings_new_outlined),
-            selectedIcon: Icon(Icons.power_settings_new),
-            label: 'Home',
+            icon: const Icon(Icons.power_settings_new_outlined),
+            selectedIcon: const Icon(Icons.power_settings_new),
+            label: l10n.navHome,
           ),
           NavigationDestination(
-            icon: Icon(Icons.public_outlined),
-            selectedIcon: Icon(Icons.public),
-            label: 'Servers',
+            icon: const Icon(Icons.public_outlined),
+            selectedIcon: const Icon(Icons.public),
+            label: l10n.navServers,
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings),
+            label: l10n.navSettings,
           ),
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Logs',
+            icon: const Icon(Icons.receipt_long_outlined),
+            selectedIcon: const Icon(Icons.receipt_long),
+            label: l10n.navLogs,
           ),
         ],
       ),

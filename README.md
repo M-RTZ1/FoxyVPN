@@ -1,23 +1,26 @@
 <div align="center">
 
-# 🦊 FoxyVPN Desktop
+# FoxyVPN for Windows
 
 <p align="center">
-  <img src="assets/images/foxyvpn_logo.jpg" alt="FoxyVPN Desktop" width="120"/>
+  <img src="assets/images/foxyvpn_logo.jpg" alt="FoxyVPN logo" width="140"/>
 </p>
 
-<p align="center">
-  <b>Secure • Fast • Private VPN Client for Windows</b>
-</p>
+![Windows](https://img.shields.io/badge/Windows-10%2F11_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-0288D1?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-212121?style=for-the-badge)
 
-<br>
+*FoxyVPN for Windows signs in with a Firefox account, obtains a proxy pass from
+Mozilla's Guardian service, and carries the whole PC's traffic through Firefox
+VPN's Fastly edge over HTTP/2 tunnels. It is the desktop port of the FoxyVPN
+Android app, written in Dart with Flutter (Material 3).*
 
-<img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows&logoColor=white"/>
-<img src="https://img.shields.io/badge/Built%20With-Flutter-02569B?style=flat-square&logo=flutter&logoColor=white"/>
-<img src="https://img.shields.io/badge/Language-Dart-0175C2?style=flat-square&logo=dart&logoColor=white"/>
-<img src="https://img.shields.io/badge/License-MIT-green?style=flat-square"/>
+**No subscription. No WireGuard.** It runs on the free **50 GB/month** of VPN
+traffic Mozilla includes with a Firefox account.
 
 </div>
+
 <br>
 
 ## 🔎 Features
@@ -27,13 +30,15 @@
 | 🛡 **System-wide VPN** | A `wintun` adapter plus host-side default-route and DNS takeover |
 | 🦊 **Firefox account sign-in** | FxA OAuth + PBKDF2 / HKDF / Hawk, tokens in the Windows credential vault |
 | 🌍 **Multiple servers** | Location picker fed by Mozilla's Remote Settings, with edge failover |
-| 🔌 **Proxy-only mode** | Local proxy on `127.0.0.1:1080` — no adapter, no admin rights needed |
+| 🔌 **Proxy-only mode** | Local proxy on `127.0.0.1:21080` — no adapter, no admin rights needed |
 | 🖥 **Windows system proxy** | Registers the local port as the machine proxy, restores it on disconnect |
 | 🔗 **Upstream proxy chaining** | Dials Fastly (and the control plane) through an existing SOCKS5/HTTP proxy |
 | 🔐 **Encrypted DNS** | DNS-over-HTTPS resolution plus `mapdns` fake-IP handling |
 | 🚪 **Exit verification** | Confirms your public IP changed before reporting "connected" |
 | 📊 **Live stats + logs** | Speed counters and an in-app log viewer |
 | 🌗 **Dark / light / system theme** | |
+| 🔤 **English & فارسی** | Full RTL layout with the Vazirmatn font |
+| 🔔 **Update check** | Notices a newer GitHub release and links straight to its download |
 | 📱 **Phone-sized window** | Fixed 360×800 (9:20), non-resizable — same layout as the Android UI |
 
 > [!NOTE]
@@ -75,7 +80,7 @@ wintun adapter (10.8.0.2, MTU 8500)   ◄── default route + DNS moved here b
 hev-socks5-tunnel (child process)     ◄── mapdns fake-IP 100.64.0.0/10, DNS at 198.18.0.2
      │  SOCKS5 / HTTP
      ▼
-LocalSocks5Server (Dart, 127.0.0.1:1080)   ◄── mixed-protocol port
+LocalSocks5Server (Dart, 127.0.0.1:21080)   ◄── mixed-protocol port
      │  one HTTP/2 stream per connection
      ▼
 H2UpstreamSession (TLS + ALPN h2 + Bearer proxy pass)
@@ -164,6 +169,19 @@ flutter analyze
 flutter test
 ```
 
+### Publishing a release
+
+The in-app check reads `https://api.github.com/repos/M-RTZ1/FoxyVPN/releases/latest`:
+
+- Tag the release with the pubspec version verbatim (`1.0.1+2`). A leading `v`
+  and a `+build` suffix are ignored when comparing, but the tag has to describe
+  a higher number than the running build.
+- Upload **a zip of the whole `Release` folder**, not `FoxyVPN.exe` on its own:
+  the exe needs `flutter_windows.dll`, the plugin DLLs and `data\` beside it.
+- At most one check per 24 hours is sent, and dismissing a version silences
+  only that version — the next release asks again. Settings → About can poll
+  on demand.
+
 <br>
 
 ## 🪟 Two things to know before connecting
@@ -206,12 +224,18 @@ app on the machine goes through the tunnel without configuration.
 ### Proxy-only mode
 
 Settings → **Proxy-only mode**. The app just runs the local proxy at
-`127.0.0.1:1080` (port configurable) and you point browsers or apps at it
+`127.0.0.1:21080` (port configurable) and you point browsers or apps at it
 manually. No wintun, no native binary, no elevation.
 
 The port is **mixed-protocol**: it speaks SOCKS5 *and* plain HTTP proxying
 (`CONNECT` plus absolute-URI requests) on the same socket — which is exactly
 what Windows' system proxy expects.
+
+Edits in Settings are saved the moment a field loses focus, and while
+proxy-only mode is connected the listener rebinds to the new address or port
+right away (the Windows system proxy is repointed too). In full-VPN mode the
+change lands on the next connect, since the tunnel engine is launched with the
+port baked into its config.
 
 ### Windows system proxy
 
@@ -288,7 +312,7 @@ require a proxy.
 
 - [firefox-vpn-client](https://github.com/UjuiUjuMandan/firefox-vpn-client) —
   the Go reference client the original app is a port of
-- [FoxyVPN](https://github.com/Vauth/FoxyVPN) — the Android app this is ported
+- [FoxyVPN](https://github.com/M-RTZ1/FoxyVPN) — the Android app this is ported
   from
 - [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) — the native
   tun2socks engine

@@ -5,6 +5,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../core/app_logger.dart';
+import '../data/split_tunnel_rules.dart';
+import 'direct_flow_dialer.dart';
 import 'hev_socks5_tunnel.dart';
 import 'socket_byte_reader.dart';
 import 'socks5_udp_dns_relay.dart';
@@ -34,6 +36,12 @@ class _RefusalRecord {
 /// SOCKS5 when the first byte is 0x05, otherwise plain HTTP proxying
 /// (CONNECT and absolute-URI requests) so the Windows *system* proxy — which
 /// only understands HTTP — can point at it too.
+///
+/// Split tunneling is decided here, on the target the client asked for: a
+/// matching rule dials that flow straight from the machine instead of opening
+/// an upstream stream. Both frontends get it for free, and it happens before
+/// the session is awaited, so bypassed sites also work while the tunnel is
+/// redialing.
 class LocalSocks5Server {
   LocalSocks5Server({
     required this.bindAddress,
@@ -41,6 +49,8 @@ class LocalSocks5Server {
     required this.rejectFakeDnsAddresses,
     required this.sessionProvider,
     this.onSessionUnhealthy,
+    this.splitTunnelPolicy,
+    this.directDialer,
   });
 
   final String bindAddress;
@@ -48,6 +58,11 @@ class LocalSocks5Server {
   final bool rejectFakeDnsAddresses;
   final UpstreamSession? Function() sessionProvider;
   final void Function()? onSessionUnhealthy;
+
+  /// Live rule set; null consults nothing. Read per flow so a Settings edit
+  /// takes effect without reconnecting.
+  final SplitTunnelPolicy? Function()? splitTunnelPolicy;
+  final DirectFlowDialer? directDialer;
 
   ServerSocket? _serverSocket;
   int _activeConnections = 0;
@@ -69,6 +84,14 @@ class LocalSocks5Server {
   int _cachedRefusalRejections = 0;
   int _declinedDestinations = 0;
   int _sessionAuthRejections = 0;
+  int _directFlows = 0;
+  int _directFallbacks = 0;
+
+  /// Flows that bypassed the tunnel in this listener's lifetime.
+  int get directFlows => _directFlows;
+
+  /// Flows a rule wanted to bypass, but that had to be tunnelled anyway.
+  int get directFallbacks => _directFallbacks;
 
   /// Traffic counters (used for the speed readout; hev's native stats are
   /// not reachable from Dart on Windows).
@@ -137,6 +160,14 @@ class LocalSocks5Server {
       AppLogger.i(_tag,
           '$_sessionAuthRejections connection(s) were refused while the '
           'tunnel\'s proxy pass was being rejected by the edge');
+    }
+    if (_directFlows > 0 || _directFallbacks > 0) {
+      AppLogger.i(
+        _tag,
+        'split tunneling: $_directFlows connection(s) bypassed the tunnel'
+        '${_directFallbacks > 0 ? ' and $_directFallbacks fell back to it '
+            '(a bypass is never a leak)' : ''}',
+      );
     }
     if (_upstreamFailures > 0) {
       AppLogger.w(_tag,
@@ -392,6 +423,9 @@ class LocalSocks5Server {
       return const _StreamAttempt(deny: _Deny.localNetwork);
     }
 
+    final bypassed = await _maybeDialDirect(targetHost, targetPort);
+    if (bypassed != null) return _StreamAttempt(stream: bypassed);
+
     if (_isKnownUnreachable(targetKey)) {
       _cachedRefusalRejections++;
       AppLogger.d(_tag, 'refusing $targetKey: the edge refused it moments ago');
@@ -453,6 +487,42 @@ class LocalSocks5Server {
         onSessionUnhealthy?.call();
     }
     return _StreamAttempt(cause: cause);
+  }
+
+  /// The split-tunnel answer for one flow: a bypassed [TunneledStream], or
+  /// null when the flow must go through the tunnel.
+  ///
+  /// A rule can redirect traffic, never leak it — when no direct path can be
+  /// established (no route, no DNS-over-HTTPS answer, host unreachable) the
+  /// flow simply continues on the tunnel.
+  Future<TunneledStream?> _maybeDialDirect(String host, int port) async {
+    final dialer = directDialer;
+    if (dialer == null) return null;
+    SplitTunnelDecision? decision;
+    try {
+      decision = splitTunnelPolicy?.call()?.decide(host);
+    } catch (e) {
+      AppLogger.w(_tag, 'the split-tunnel rules could not be read', e);
+      return null;
+    }
+    if (decision == null || !decision.bypassesTunnel) return null;
+
+    TunneledStream? bypassed;
+    try {
+      bypassed = await dialer.dial(host, port);
+    } catch (e) {
+      AppLogger.d(_tag, 'the direct dial for $host threw: $e');
+    }
+    if (bypassed == null) {
+      _directFallbacks++;
+      AppLogger.d(_tag,
+          '$host matches ${decision.label} but has no direct path; '
+          'sending it through the tunnel instead');
+      return null;
+    }
+    _directFlows++;
+    AppLogger.d(_tag, '$host:$port left through the machine ($decision)');
+    return bypassed;
   }
 
   Future<void> _relay(

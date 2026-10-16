@@ -1,7 +1,7 @@
 name: foxyvpn
 description: "FoxyVPN for Windows - unofficial Firefox VPN client (Flutter port)."
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ^3.12.2
@@ -32,6 +32,10 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/certs/
+    # Snapshot of the Remote Settings server list, used only when the online
+    # fetch cannot reach Mozilla.
+    - assets/data/
     # Bundled so AppVersion can read `version:` at runtime: one source of
     # truth for the exe metadata, the About screen and the update check.
     - pubspec.yaml

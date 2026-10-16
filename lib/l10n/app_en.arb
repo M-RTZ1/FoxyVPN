@@ -15,17 +15,25 @@
   "statusConnecting": "Connecting…",
   "statusWaitingForNetwork": "Waiting for network…",
   "statusReconnecting": "Reconnecting…",
-  "statusConnectedVpn": "Connected • {country}",
-  "@statusConnectedVpn": {
+  "statusTunnelActive": "Tunnel • {country}",
+  "@statusTunnelActive": {
     "placeholders": { "country": { "type": "String" } }
   },
-  "statusProxyActive": "Proxy active • {address}",
+  "statusSystemProxyActive": "System proxy • {address}",
+  "@statusSystemProxyActive": {
+    "placeholders": { "address": { "type": "String" } }
+  },
+  "statusProxyActive": "Proxy • {address}",
   "@statusProxyActive": {
     "placeholders": { "address": { "type": "String" } }
   },
 
-  "homeEstablishingTunnel": "Establishing the tunnel…",
+  "homeEstablishingTunnel": "Establishing the connection…",
   "homeTrafficUnprotected": "Your traffic is not protected",
+  "homeLocalProxy": "Local proxy at {address}",
+  "@homeLocalProxy": {
+    "placeholders": { "address": { "type": "String" } }
+  },
   "statDownload": "Download",
   "statUpload": "Upload",
   "quotaPending": "Quota information appears once the tunnel connects.",
@@ -38,6 +46,14 @@
     "placeholders": { "remaining": { "type": "String" } }
   },
   "autoSelectedLocation": "Auto-selected location",
+  "homeSplitTunnelRules": "{count} split-tunnel rule(s) armed",
+  "@homeSplitTunnelRules": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "homeSplitTunnelBypassed": "{count} connection(s) went around the VPN",
+  "@homeSplitTunnelBypassed": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "exitLocation": "Exit location: {location}",
   "@exitLocation": {
     "placeholders": { "location": { "type": "String" } }
@@ -70,6 +86,7 @@
     "placeholders": { "error": { "type": "String" } }
   },
   "serversNoneAvailable": "No locations are available right now.",
+  "serversBundledSnapshot": "The live server list could not be reached, so the copy bundled with the app is shown. It may be outdated.",
   "serversNoServers": "No usable servers in this country.",
   "serversCityCount": "{count} city(ies)",
   "@serversCityCount": {
@@ -79,11 +96,24 @@
   "@serversPort": {
     "placeholders": { "port": { "type": "int" } }
   },
+  "serversPinging": "pinging…",
+  "serversPingUnavailable": "ping unavailable",
+  "serversPingResult": "{ms} ms",
+  "@serversPingResult": {
+    "placeholders": { "ms": { "type": "int" } }
+  },
   "serversTryAgain": "Try again",
 
   "sectionAppearance": "Appearance",
   "sectionLanguage": "Language",
   "sectionConnection": "Connection",
+  "sectionConnectionMode": "Connection mode",
+  "connectionModeProxy": "Proxy",
+  "connectionModeSystemProxy": "System proxy",
+  "connectionModeTunnel": "Tunnel",
+  "connectionModeProxyDesc": "Only apps manually configured to use the local proxy (127.0.0.1:21080) are routed through the VPN.",
+  "connectionModeSystemProxyDesc": "Windows system proxy is set automatically so most apps (browsers, etc.) route through the VPN without manual configuration.",
+  "connectionModeTunnelDesc": "Full system-wide VPN: all traffic is routed through the tunnel via a Wintun adapter. Requires running as Administrator.",
   "sectionLocalProxy": "Local proxy (SOCKS5 + HTTP)",
   "sectionUpstreamProxy": "Chain through an upstream proxy",
   "sectionTunnelEngine": "Tunnel engine",
@@ -98,10 +128,6 @@
 
   "exitCheckTitle": "Exit check",
   "exitCheckSubtitle": "Verify the exit country after connecting and log a warning on mismatch",
-  "proxyOnlyTitle": "Proxy-only mode",
-  "proxyOnlySubtitle": "Expose only the local proxy; no wintun adapter, no admin rights needed",
-  "systemProxyTitle": "Set as Windows system proxy",
-  "systemProxySubtitle": "While connected, point Windows (and every app that honours it) at the local HTTP proxy; reverted on disconnect",
   "dohTitle": "DNS-over-HTTPS resolver (for edge resolution)",
   "customDnsTitle": "Custom DNS server for the tunnel",
   "customDnsSubtitle": "When on, the TUN interface hands this resolver to apps instead of on-device fake-DNS",
@@ -116,6 +142,21 @@
   "errorInvalidIp": "Invalid IP address",
   "portLabel": "Port",
   "errorInvalidPort": "Invalid port number",
+
+  "sectionSplitTunnel": "Split tunneling",
+  "splitTunnelTitle": "Split tunneling by destination",
+  "splitTunnelSubtitle": "Send chosen domains and address ranges around the VPN. Per-app rules are not possible: the tunnel cannot see which process opened a connection.",
+  "splitTunnelDefaultTitle": "Traffic that matches no rule",
+  "splitTunnelActionTunnel": "Via VPN",
+  "splitTunnelActionDirect": "Bypass VPN",
+  "splitTunnelActionLabel": "Action for the rule you add next",
+  "splitTunnelPatternLabel": "Domain or address",
+  "splitTunnelPatternHelper": "e.g. .ir, example.com, 203.0.113.7 or 192.168.0.0/16",
+  "splitTunnelAddRule": "Add rule",
+  "splitTunnelInvalidPattern": "Not a usable domain or address",
+  "splitTunnelNoRules": "No rules yet. Add a TLD such as .ir, a hostname, or an IPv4 range.",
+  "splitTunnelDeleteRule": "Remove this rule",
+  "splitTunnelApplyHint": "Rules apply to new connections. IPv4 only: the tunnel carries no IPv6 traffic, so IPv6 already leaves the VPN.",
   "upstreamTitle": "Use an upstream proxy",
   "upstreamSubtitle": "Route everything (sign-in, Guardian, server list and the edge dials) through a SOCKS5 or HTTP proxy; credentials apply to the edge connection",
   "proxyTypeLabel": "Proxy type",

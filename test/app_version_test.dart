@@ -9,6 +9,7 @@ void main() {
     // Falls back to 0.0.0 when the asset is not bundled, which would silently
     // make every release look newer than the running build.
     expect(AppVersion.full, isNot('0.0.0'));
-    expect(AppVersion.number, matches(RegExp(r'^\d+\.\d+\.\d+$')));
+    // The build number is part of the version: releases are 1.0.0+1, +2, ...
+    expect(AppVersion.full, matches(RegExp(r'^\d+\.\d+\.\d+(\+\d+)?$')));
   });
 }

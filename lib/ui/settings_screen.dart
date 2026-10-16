@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../core/app_version.dart';
 import '../data/settings_store.dart';
+import '../data/split_tunnel_rules.dart';
 import '../data/update_checker.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../vpn/system_proxy_manager.dart';
@@ -29,6 +30,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _proxyPasswordController =
       TextEditingController();
   late final TextEditingController _tunnelPathController;
+  final TextEditingController _splitPatternController = TextEditingController();
+
+  /// Action used for the next rule the user adds; most people come here to
+  /// bypass something, so that is the starting choice.
+  SplitTunnelAction _newSplitAction = SplitTunnelAction.direct;
 
   @override
   void initState() {
@@ -76,6 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _proxyUsernameController.dispose();
     _proxyPasswordController.dispose();
     _tunnelPathController.dispose();
+    _splitPatternController.dispose();
     super.dispose();
   }
 
@@ -127,7 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         release?.version ?? '',
       ),
       UpdateStatus.upToDate => l10n.updateUpToDate(
-        release?.version ?? AppVersion.number,
+        release?.version ?? AppVersion.full,
       ),
       UpdateStatus.nonePublished => l10n.updateNonePublished,
       UpdateStatus.failed => l10n.updateFailed(checker.error ?? ''),
@@ -154,6 +161,211 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ? checker.openDownload()
                 : checker.checkNow(),
     );
+  }
+
+  String _splitActionLabel(AppLocalizations l10n, SplitTunnelAction action) =>
+      action == SplitTunnelAction.tunnel
+      ? l10n.splitTunnelActionTunnel
+      : l10n.splitTunnelActionDirect;
+
+  /// Adds a rule from the text field, or a preset when a chip was tapped.
+  /// Re-adding a pattern changes what it does instead of stacking a second
+  /// rule that the first one shadows.
+  void _addSplitRule({String? preset}) {
+    final l10n = AppLocalizations.of(context);
+    final input = (preset ?? _splitPatternController.text).trim();
+    if (input.isEmpty) return;
+    final rule = SplitTunnelRule.parse(input, action: _newSplitAction);
+    if (rule == null) {
+      _showError(l10n.splitTunnelInvalidPattern);
+      return;
+    }
+    final rules = _settings.splitTunnelRules;
+    final index = rules.indexWhere(
+      (existing) =>
+          existing.pattern == rule.pattern && existing.kind == rule.kind,
+    );
+    if (index >= 0) {
+      rules[index] = rule;
+    } else {
+      rules.add(rule);
+    }
+    _settings.splitTunnelRules = rules;
+    if (preset == null) _splitPatternController.clear();
+  }
+
+  void _removeSplitRuleAt(int index) {
+    final rules = _settings.splitTunnelRules;
+    if (index < 0 || index >= rules.length) return;
+    rules.removeAt(index);
+    _settings.splitTunnelRules = rules;
+  }
+
+  void _setSplitRuleAction(int index, SplitTunnelAction action) {
+    final rules = _settings.splitTunnelRules;
+    if (index < 0 || index >= rules.length) return;
+    final rule = rules[index];
+    rules[index] = SplitTunnelRule(
+      pattern: rule.pattern,
+      kind: rule.kind,
+      action: action,
+      enabled: rule.enabled,
+    );
+    _settings.splitTunnelRules = rules;
+  }
+
+  Widget _splitRuleTile(
+    AppLocalizations l10n,
+    SplitTunnelRule rule,
+    int index,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      child: Row(
+        children: [
+          Icon(
+            rule.kind == SplitTunnelPatternKind.address
+                ? Icons.numbers
+                : Icons.public,
+            size: 18,
+            color: scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              rule.display,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          DropdownButton<SplitTunnelAction>(
+            value: rule.action,
+            isDense: true,
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final action in SplitTunnelAction.values)
+                DropdownMenuItem(
+                  value: action,
+                  child: Text(
+                    _splitActionLabel(l10n, action),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+            ],
+            onChanged: (v) {
+              if (v != null) _setSplitRuleAction(index, v);
+            },
+          ),
+          IconButton(
+            tooltip: l10n.splitTunnelDeleteRule,
+            icon: const Icon(Icons.delete_outline, size: 18),
+            onPressed: () => _removeSplitRuleAt(index),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _splitTunnelSection(AppLocalizations l10n) {
+    final rules = _settings.splitTunnelRules;
+    final hint = TextStyle(
+      fontSize: 12,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    return [
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(l10n.splitTunnelTitle),
+        subtitle: Text(l10n.splitTunnelSubtitle),
+        value: _settings.splitTunnelEnabled,
+        onChanged: (v) => _settings.splitTunnelEnabled = v,
+      ),
+      _DropdownTile<SplitTunnelAction>(
+        title: l10n.splitTunnelDefaultTitle,
+        value: _settings.splitTunnelDefaultAction,
+        values: SplitTunnelAction.values,
+        labelOf: (action) => _splitActionLabel(l10n, action),
+        onChanged: (v) => _settings.splitTunnelDefaultAction = v,
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
+        child: Text(l10n.splitTunnelActionLabel, style: hint),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+        child: SegmentedButton<SplitTunnelAction>(
+          segments: [
+            ButtonSegment(
+              value: SplitTunnelAction.tunnel,
+              icon: const Icon(Icons.vpn_lock, size: 18),
+              label: Text(l10n.splitTunnelActionTunnel),
+            ),
+            ButtonSegment(
+              value: SplitTunnelAction.direct,
+              icon: const Icon(Icons.alt_route, size: 18),
+              label: Text(l10n.splitTunnelActionDirect),
+            ),
+          ],
+          selected: {_newSplitAction},
+          showSelectedIcon: false,
+          onSelectionChanged: (selection) =>
+              setState(() => _newSplitAction = selection.first),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _splitPatternController,
+                onSubmitted: (_) => _addSplitRule(),
+                decoration: InputDecoration(
+                  labelText: l10n.splitTunnelPatternLabel,
+                  helperText: l10n.splitTunnelPatternHelper,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: l10n.splitTunnelAddRule,
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: _addSplitRule,
+            ),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            for (final tld in splitTunnelTldPresets)
+              ActionChip(
+                label: Text('.$tld'),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _addSplitRule(preset: '.$tld'),
+              ),
+          ],
+        ),
+      ),
+      if (rules.isEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+          child: Text(l10n.splitTunnelNoRules, style: hint),
+        )
+      else
+        for (var index = 0; index < rules.length; index++)
+          _splitRuleTile(l10n, rules[index], index),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 2),
+        child: Text(l10n.splitTunnelApplyHint, style: hint),
+      ),
+    ];
   }
 
   @override
@@ -229,19 +441,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: _settings.exitCheckEnabled,
                   onChanged: (v) => _settings.exitCheckEnabled = v,
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.proxyOnlyTitle),
-                  subtitle: Text(l10n.proxyOnlySubtitle),
-                  value: _settings.proxyOnlyMode,
-                  onChanged: (v) => _settings.proxyOnlyMode = v,
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.systemProxyTitle),
-                  subtitle: Text(l10n.systemProxySubtitle),
-                  value: _settings.systemProxyEnabled,
-                  onChanged: (v) => _settings.systemProxyEnabled = v,
+                _SectionTitle(l10n.sectionConnectionMode),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SegmentedButton<ConnectionMode>(
+                        segments: [
+                          ButtonSegment(
+                            value: ConnectionMode.proxy,
+                            icon: const Icon(Icons.lan_outlined),
+                            label: Text(l10n.connectionModeProxy),
+                          ),
+                          ButtonSegment(
+                            value: ConnectionMode.systemProxy,
+                            icon: const Icon(Icons.settings_ethernet),
+                            label: Text(l10n.connectionModeSystemProxy),
+                          ),
+                          ButtonSegment(
+                            value: ConnectionMode.tunnel,
+                            icon: const Icon(Icons.vpn_lock),
+                            label: Text(l10n.connectionModeTunnel),
+                          ),
+                        ],
+                        selected: {_settings.connectionMode},
+                        onSelectionChanged: (selection) =>
+                            _settings.connectionMode = selection.first,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        switch (_settings.connectionMode) {
+                          ConnectionMode.proxy =>
+                            l10n.connectionModeProxyDesc,
+                          ConnectionMode.systemProxy =>
+                            l10n.connectionModeSystemProxyDesc,
+                          ConnectionMode.tunnel =>
+                            l10n.connectionModeTunnelDesc,
+                        },
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 _DropdownTile<DohProvider>(
                   title: l10n.dohTitle,
@@ -321,6 +566,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _settings.socksPort = port;
                   },
                 ),
+                _SectionTitle(l10n.sectionSplitTunnel),
+                ..._splitTunnelSection(l10n),
                 _SectionTitle(l10n.sectionUpstreamProxy),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,

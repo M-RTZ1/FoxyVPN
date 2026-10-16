@@ -43,13 +43,13 @@ class AppLogger {
   static void w(String tag, String message, [Object? error]) {
     debugPrint('W/$tag: $message${error != null ? ': $error' : ''}');
     _log(LogLevel.warn, tag,
-        error != null ? '$message: $_errMessage(error)' : message);
+        error != null ? '$message: ${_errMessage(error)}' : message);
   }
 
   static void e(String tag, String message, [Object? error]) {
     debugPrint('E/$tag: $message${error != null ? ': $error' : ''}');
     _log(LogLevel.error, tag,
-        error != null ? '$message: $_errMessage(error)' : message);
+        error != null ? '$message: ${_errMessage(error)}' : message);
   }
 
   static String _errMessage(Object error) {

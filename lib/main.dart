@@ -5,6 +5,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'core/app_version.dart';
 import 'data/proxy_state_store.dart';
+import 'data/server_list_store.dart';
 import 'data/settings_store.dart';
 import 'data/update_checker.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -24,12 +25,19 @@ Future<void> main() async {
   await windowManager.setResizable(false);
   await windowManager.setTitle('FoxyVPN');
   await windowManager.center();
+  // Without this, WM_CLOSE destroys the window straight away and the
+  // onWindowClose handler races the engine teardown it is awaiting — the
+  // wintun adapter, the split routes and the DNS hijack would be left behind.
+  await windowManager.setPreventClose(true);
 
   await SettingsStore.instance.init();
   await ProxyStateStore.instance.init();
   await AppVersion.load();
 
   runApp(const FoxyVpnApp());
+  // The server list paints from the bundled snapshot first, so this only
+  // decides when the live one replaces it.
+  unawaited(ServerListStore.instance.boot());
   unawaited(UpdateChecker.instance.checkOnStartup());
 }
 

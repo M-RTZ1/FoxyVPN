@@ -7,8 +7,8 @@ import 'package:foxyvpn/data/update_checker.dart';
 
 void main() {
   group('version parsing', () {
-    test('tag prefix and build metadata are dropped', () {
-      expect(UpdateChecker.versionFromTag('v1.2.0+3'), '1.2.0');
+    test('the tag prefix is dropped and the build number is kept', () {
+      expect(UpdateChecker.versionFromTag('v1.2.0+3'), '1.2.0+3');
       expect(UpdateChecker.versionFromTag('V1.2.0'), '1.2.0');
       expect(UpdateChecker.versionFromTag('  v1.2.0 '), '1.2.0');
       expect(UpdateChecker.versionFromTag('1.2.0-beta1'), '1.2.0-beta1');
@@ -28,7 +28,30 @@ void main() {
         greaterThan(0),
       );
       expect(UpdateChecker.compareVersions('1.0.0-rc1', '1.0.0'), lessThan(0));
-      expect(UpdateChecker.compareVersions('v1.2.3+456', '1.2.3'), 0);
+    });
+
+    test('a higher build number is a newer release', () {
+      // This project ships build-only updates (1.0.0+1, 1.0.0+2, ...), so the
+      // build number has to break the tie or no update is ever detected.
+      expect(
+        UpdateChecker.compareVersions('1.0.0+3', '1.0.0+2'),
+        greaterThan(0),
+      );
+      expect(UpdateChecker.compareVersions('1.0.0+2', '1.0.0+3'), lessThan(0));
+      expect(UpdateChecker.compareVersions('1.0.0+2', '1.0.0+2'), 0);
+      expect(
+        UpdateChecker.compareVersions('v1.2.3+456', '1.2.3'),
+        greaterThan(0),
+      );
+      // ...but it never outranks the release numbering itself.
+      expect(
+        UpdateChecker.compareVersions('1.0.1', '1.0.0+99'),
+        greaterThan(0),
+      );
+      expect(
+        UpdateChecker.compareVersions('1.0.0-rc1+9', '1.0.0+1'),
+        lessThan(0),
+      );
     });
   });
 
@@ -133,15 +156,20 @@ void main() {
         'test/fixtures/github_release_latest.json',
       ).readAsStringSync();
       final release = UpdateChecker.parseRelease(jsonDecode(fixture))!;
-      expect(release.tag, '1.0.0+2');
-      expect(release.version, '1.0.0');
+      expect(release.tag, '1.0.0+3');
+      expect(release.version, '1.0.0+3');
       expect(release.prerelease, isFalse);
       expect(release.assetName, 'FoxyVPN.exe');
       expect(release.downloadUrl, endsWith('/FoxyVPN.exe'));
       expect(release.publishedAt, isNotNull);
 
       // The shipped build matches that tag, so nothing is offered.
-      expect(UpdateChecker.compareVersions(release.version, '1.0.0'), 0);
+      expect(UpdateChecker.compareVersions(release.version, '1.0.0+3'), 0);
+      // The build before it must still count as an update.
+      expect(
+        UpdateChecker.compareVersions(release.version, '1.0.0+1'),
+        greaterThan(0),
+      );
       expect(
         UpdateChecker.compareVersions(release.version, '0.9.9'),
         greaterThan(0),

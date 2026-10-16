@@ -21,6 +21,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _codeController = TextEditingController();
 
+  /// startLogin() keeps the pending session token on the instance, so the 2FA
+  /// step has to run on the same object — a fresh repository would always
+  /// throw "No pending FxA session".
+  final _auth = FxaAuthRepository(TokenStore.instance);
+
   bool _twoFactorStep = false;
   bool _busy = false;
   bool _obscurePassword = true;
@@ -41,9 +46,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      final needsTwoFactor = await FxaAuthRepository(TokenStore.instance)
-          .startLogin(
-              _emailController.text.trim(), _passwordController.text);
+      final needsTwoFactor = await _auth.startLogin(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
       if (!mounted) return;
       if (needsTwoFactor) {
         setState(() {
@@ -70,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await FxaAuthRepository(TokenStore.instance).submitTwoFactorCode(code);
+      await _auth.submitTwoFactorCode(code);
       if (!mounted) return;
       widget.onSignedIn();
     } catch (e) {

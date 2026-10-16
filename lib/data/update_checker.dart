@@ -44,7 +44,7 @@ class GithubRelease {
 
   final String tag;
 
-  /// [tag] without the leading `v` and without `+build`.
+  /// [tag] without the leading `v`; the `+build` suffix is kept.
   final String version;
   final String pageUrl;
   final bool prerelease;
@@ -139,7 +139,7 @@ class UpdateChecker extends ChangeNotifier {
       );
       AppLogger.i(
         _tag,
-        'latest release is ${release.tag} (running ${AppVersion.number}): '
+        'latest release is ${release.tag} (running ${AppVersion.full}): '
         '${isNewer ? 'an update is available' : 'up to date'}',
       );
     } catch (e) {
@@ -170,7 +170,7 @@ class UpdateChecker extends ChangeNotifier {
   }
 
   bool _isAfterCurrentBuild(GithubRelease release) =>
-      compareVersions(release.version, AppVersion.number) > 0;
+      compareVersions(release.version, AppVersion.full) > 0;
 
   void _setStatus(
     UpdateStatus status, {
@@ -193,19 +193,20 @@ class UpdateChecker extends ChangeNotifier {
     return error.toString();
   }
 
-  /// `v1.2.0+3`, `1.2.0`, `v1.2.0-beta1` → `1.2.0` / `1.2.0-beta1`.
+  /// `v1.2.0+3`, `1.2.0`, `v1.2.0-beta1` → `1.2.0+3` / `1.2.0` / `1.2.0-beta1`.
+  /// The build number is kept: releases here are numbered `1.0.0+1`, `1.0.0+2`
+  /// …, so dropping it would make every build-only update look identical.
   static String versionFromTag(String tag) {
     var version = tag.trim();
     if (version.startsWith('v') || version.startsWith('V')) {
       version = version.substring(1);
     }
-    final build = version.indexOf('+');
-    if (build > 0) version = version.substring(0, build);
     return version;
   }
 
-  /// Numeric `major.minor.patch` order, with a pre-release ranked below the
-  /// stable release it precedes. Returns >0 when [left] is newer.
+  /// Numeric `major.minor.patch` order, then pre-release label (a pre-release
+  /// ranks below the stable release it precedes), then the `+build` number.
+  /// Returns >0 when [left] is newer.
   static int compareVersions(String left, String right) {
     final a = _splitVersion(left);
     final b = _splitVersion(right);
@@ -213,15 +214,25 @@ class UpdateChecker extends ChangeNotifier {
       final order = a.numbers[i].compareTo(b.numbers[i]);
       if (order != 0) return order;
     }
-    if (a.pre == b.pre) return 0;
-    // 1.2.0 beats 1.2.0-rc1; between two pre-releases the label decides.
-    if (a.pre == null) return 1;
-    if (b.pre == null) return -1;
-    return a.pre!.compareTo(b.pre!);
+    if (a.pre != b.pre) {
+      // 1.2.0 beats 1.2.0-rc1; between two pre-releases the label decides.
+      if (a.pre == null) return 1;
+      if (b.pre == null) return -1;
+      return a.pre!.compareTo(b.pre!);
+    }
+    return a.build.compareTo(b.build);
   }
 
-  static ({List<int> numbers, String? pre}) _splitVersion(String version) {
-    final normalized = versionFromTag(version);
+  static ({List<int> numbers, String? pre, int build}) _splitVersion(
+    String version,
+  ) {
+    var normalized = versionFromTag(version);
+    var build = 0;
+    final plus = normalized.indexOf('+');
+    if (plus >= 0) {
+      build = int.tryParse(normalized.substring(plus + 1)) ?? 0;
+      normalized = normalized.substring(0, plus);
+    }
     final dash = normalized.indexOf('-');
     final core = dash < 0 ? normalized : normalized.substring(0, dash);
     final parts = core.split('.');
@@ -232,6 +243,7 @@ class UpdateChecker extends ChangeNotifier {
     return (
       numbers: numbers,
       pre: dash < 0 ? null : normalized.substring(dash + 1),
+      build: build,
     );
   }
 

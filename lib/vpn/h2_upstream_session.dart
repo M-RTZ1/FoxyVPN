@@ -10,6 +10,7 @@ import '../data/settings_store.dart';
 import 'route_manager.dart';
 import 'socket_byte_reader.dart';
 import 'upstream_session.dart';
+import 'upstream_trust.dart';
 
 const String _tag = 'H2UpstreamSession';
 
@@ -114,9 +115,11 @@ class H2UpstreamSession implements UpstreamSession {
 
     SecureSocket secure;
     try {
+      final trustContext = await UpstreamTrust.trustedContext();
       secure = await SecureSocket.secure(
         raw,
         host: upstreamHost,
+        context: trustContext,
         supportedProtocols: const ['h2'],
       ).timeout(_tcpConnectTimeout);
     } catch (e) {

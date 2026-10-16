@@ -11,8 +11,11 @@ import '../data/guardian_client.dart';
 import '../data/models.dart';
 import '../data/proxy_state_store.dart';
 import '../data/server_list_client.dart';
+import '../data/server_list_store.dart';
 import '../data/settings_store.dart';
+import '../data/split_tunnel_rules.dart';
 import '../data/token_store.dart';
+import 'direct_flow_dialer.dart';
 import 'edge_address_resolver.dart';
 import 'exit_check.dart';
 import 'h2_upstream_session.dart';
@@ -25,7 +28,6 @@ import 'upstream_session.dart';
 const String _tag = 'VpnController';
 
 const Duration _connectTimeout = Duration(seconds: 20);
-const Duration _serverListFetchTimeout = Duration(seconds: 15);
 
 const Duration _watchdogInterval = Duration(seconds: 2);
 
@@ -85,10 +87,13 @@ enum VpnStatusKind {
   waitingForNetwork,
   reconnecting,
 
-  /// [detail] is the exit country name.
-  connectedVpn,
+  /// Full tunnel mode: [detail] is the exit country name.
+  tunnelActive,
 
-  /// [detail] is the local proxy bind address and port.
+  /// System-proxy mode: [detail] is the local proxy bind address and port.
+  systemProxyActive,
+
+  /// Manual-proxy-only mode: [detail] is the local proxy bind address and port.
   proxyActive,
 }
 
@@ -137,6 +142,13 @@ class VpnController extends ChangeNotifier {
   LocalSocks5Server? _socksServer;
   UpstreamSession? _upstreamSession;
   Timer? _speedTimer;
+
+  /// Dials the flows a split-tunnel rule sent around the tunnel. One per
+  /// connection; it owns the host routes it installs until teardown.
+  DirectFlowDialer? _directDialer;
+
+  /// Flows that bypassed the tunnel during the current connection.
+  int get directFlowCount => _socksServer?.directFlows ?? 0;
 
   /// The endpoint [_socksServer] is meant to be listening on. Kept separate
   /// from the server because the speed sampler holds the same instance and
@@ -208,18 +220,18 @@ class VpnController extends ChangeNotifier {
   Future<void> shutdown() => disconnect('the application is exiting');
 
   /// A Settings edit moved the local frontend's address or port. In
-  /// proxy-only mode rebind it live; in full-VPN mode
+  /// proxy and systemProxy modes rebind it live; in tunnel mode
   /// hev-socks5-tunnel was launched with the old port baked into its config,
   /// so the change lands on the next connect.
   void _onLocalProxyEndpointChanged() {
     if (_state != ConnectionState.connected) return;
     final endpoint = SettingsStore.instance.localProxyEndpoint.value;
     if (_localProxyEndpoint == endpoint) return;
-    if (!SettingsStore.instance.proxyOnlyMode) {
+    if (SettingsStore.instance.connectionMode == ConnectionMode.tunnel) {
       AppLogger.i(
         _tag,
         'local proxy endpoint moved to ${endpoint.$1}:${endpoint.$2}; '
-        'full-VPN mode applies it on the next connect',
+        'tunnel mode applies it on the next connect',
       );
       return;
     }
@@ -230,10 +242,14 @@ class VpnController extends ChangeNotifier {
       LocalSocks5Server(
         bindAddress: bindAddress,
         port: port,
-        // Proxy-only mode runs no mapdns, so there are no fake IPs to reject.
-        rejectFakeDnsAddresses: false,
+        // Tunnel mode runs mapdns, so fake IPs must be rejected.
+        // Proxy modes have no mapdns, so fake-IP rejection is off.
+        rejectFakeDnsAddresses:
+            SettingsStore.instance.connectionMode == ConnectionMode.tunnel,
         sessionProvider: () => _upstreamSession,
         onSessionUnhealthy: _onUpstreamSessionUnhealthy,
+        splitTunnelPolicy: SettingsStore.instance.splitTunnelPolicy,
+        directDialer: _directDialer,
       );
 
   Future<void> _rebindLocalProxy() async {
@@ -282,12 +298,15 @@ class VpnController extends ChangeNotifier {
     _socksServer = replacement;
     _localProxyEndpoint = endpoint;
 
-    if (settings.systemProxyEnabled) {
+    if (settings.connectionMode == ConnectionMode.systemProxy) {
       await SystemProxyManager.instance.updateServer('127.0.0.1:$port');
     }
     _startSpeedUpdates(replacement);
+    final mode = settings.connectionMode;
     _set(
-      statusKind: VpnStatusKind.proxyActive,
+      statusKind: mode == ConnectionMode.systemProxy
+          ? VpnStatusKind.systemProxyActive
+          : VpnStatusKind.proxyActive,
       statusDetail: '$address:$port',
       clearError: true,
     );
@@ -433,59 +452,82 @@ class VpnController extends ChangeNotifier {
 
       final socksPort = settingsStore.socksPort;
       final socksBindAddress = settingsStore.socksBindAddress;
-      final proxyOnlyMode = settingsStore.proxyOnlyMode;
+      final connectionMode = settingsStore.connectionMode;
       final customDnsServer = settingsStore.effectiveCustomDnsServer;
 
       ({VpnStatusKind kind, String detail}) connectedLabel() {
-        if (proxyOnlyMode) {
-          // Read the live frontend: a Settings edit can rebind it to another
-          // address or port after this closure was created.
-          final (address, port) =
-              _localProxyEndpoint ?? (socksBindAddress, socksPort);
-          return (kind: VpnStatusKind.proxyActive, detail: '$address:$port');
+        if (connectionMode == ConnectionMode.tunnel) {
+          final target = activeCandidate();
+          final country = target.countryName.isNotEmpty
+              ? target.countryName
+              : target.countryCode;
+          return (kind: VpnStatusKind.tunnelActive, detail: country);
         }
-        final target = activeCandidate();
-        final country = target.countryName.isNotEmpty
-            ? target.countryName
-            : target.countryCode;
-        return (kind: VpnStatusKind.connectedVpn, detail: country);
+        // Proxy or system-proxy: show the live bind address/port.
+        final (address, port) =
+            _localProxyEndpoint ?? (socksBindAddress, socksPort);
+        return (
+          kind: connectionMode == ConnectionMode.systemProxy
+              ? VpnStatusKind.systemProxyActive
+              : VpnStatusKind.proxyActive,
+          detail: '$address:$port',
+        );
       }
 
-      final mapdnsActive = !proxyOnlyMode && customDnsServer == null;
+      final mapdnsActive =
+          connectionMode == ConnectionMode.tunnel && customDnsServer == null;
+      _directDialer = DirectFlowDialer(
+        underTunnelTakeover: connectionMode == ConnectionMode.tunnel,
+        dohEndpointAddresses: dohEndpointAddresses,
+      );
+      final splitPolicy = settingsStore.splitTunnelPolicy();
+      if (splitPolicy != null) {
+        AppLogger.i(
+          _tag,
+          'connect: split tunneling is on — ${splitPolicy.enabledRuleCount} '
+          'rule(s); traffic that matches none '
+          '${splitPolicy.defaultAction == SplitTunnelAction.direct ? 'bypasses' : 'takes'} '
+          'the tunnel'
+          '${mapdnsActive ? ' (mapdns lets hostname rules match by name)' : ''}',
+        );
+      }
       final socks = LocalSocks5Server(
         bindAddress: socksBindAddress,
         port: socksPort,
         rejectFakeDnsAddresses: mapdnsActive,
         sessionProvider: () => _upstreamSession,
         onSessionUnhealthy: _onUpstreamSessionUnhealthy,
+        splitTunnelPolicy: settingsStore.splitTunnelPolicy,
+        directDialer: _directDialer,
       );
       await socks.start();
       _socksServer = socks;
       _localProxyEndpoint = (socksBindAddress, socks.boundPort);
 
-      if (settingsStore.systemProxyEnabled) {
+      if (connectionMode == ConnectionMode.systemProxy) {
         // Windows' system proxy speaks HTTP only, which the local port
         // answers alongside SOCKS5.
-        await SystemProxyManager.instance.apply('127.0.0.1:$socksPort');
+        await SystemProxyManager.instance.apply('127.0.0.1:${socks.boundPort}');
       }
       _ensureGenerationCurrent(myGeneration);
 
-      if (proxyOnlyMode) {
-        AppLogger.i(
-          _tag,
-          'connect: proxy-only mode enabled, skipping the wintun tunnel; '
-          'local proxy at $socksBindAddress:$socksPort',
-        );
-      } else {
-        // Bypass routes must be installed BEFORE wintun takes the default
-        // route: the app's own control-plane, edge and upstream-proxy dials
-        // must leave through the physical gateway, not loop into the tunnel.
+      if (connectionMode == ConnectionMode.tunnel) {
+        // Bypass routes must be installed BEFORE wintun takes over DNS: the
+        // app's own control-plane, edge and upstream-proxy dials must leave
+        // through the physical gateway, not loop into the tunnel.
         await RouteManager.instance.enable(
           extraBypassHosts: [
             primaryCandidate.host,
             ?customEdgeAddress,
             if (upstreamProxyConfig != null) upstreamProxyConfig.host,
           ],
+          dohEndpointAddresses: dohEndpointAddresses,
+        );
+        // From here on the direct control-plane client resolves every host
+        // through the installed bypasses instead of the resolver, whose
+        // answers become synthetic once the tunnel owns DNS.
+        ControlPlaneHttp.useBypassResolver(
+          RouteManager.instance.ensureBypassHost,
         );
         _ensureGenerationCurrent(myGeneration);
 
@@ -495,32 +537,32 @@ class VpnController extends ChangeNotifier {
         if (binary == null) {
           throw StateError(
             'hev-socks5-tunnel.exe was not found. Place it next to the app '
-            'executable or set its path in Settings.',
+            'executable or set its path in Settings → Tunnel engine.',
           );
         }
         final configPath = await HevSocks5Tunnel.writeConfig(
           Directory.systemTemp,
-          socksPort,
+          socks.boundPort,
           customDnsServer,
         );
         final started = await HevSocks5Tunnel.start(binary, configPath);
         if (!started) {
           throw StateError(
-            'Failed to start the tun2socks tunnel (hev-socks5-tunnel). '
-            'Run the app as administrator.',
+            'Failed to start the tunnel engine (hev-socks5-tunnel). '
+            'Make sure the app is running as Administrator and that wintun.dll '
+            'is next to the executable.',
           );
         }
         AppLogger.i(_tag, 'connect: wintun tunnel started');
-        await Future<void>.delayed(
-          const Duration(milliseconds: _postTunSettleMs),
+      } else {
+        // Proxy / system-proxy modes never install bypass routes, so make sure
+        // a resolver left over from a previous tunnel connect cannot linger.
+        ControlPlaneHttp.useBypassResolver(null);
+        AppLogger.i(
+          _tag,
+          'connect: ${connectionMode.name} mode — no wintun adapter; '
+          'local proxy at $socksBindAddress:${socks.boundPort}',
         );
-
-        // The engine creates the adapter but does not route or DNS into it;
-        // the host side of the takeover lives in RouteManager.
-        await RouteManager.instance.takeoverRoutes(
-          customDnsServer: customDnsServer,
-        );
-        _ensureGenerationCurrent(myGeneration);
       }
       _ensureGenerationCurrent(myGeneration);
 
@@ -546,21 +588,12 @@ class VpnController extends ChangeNotifier {
               dohEndpointAddresses,
             );
 
-        if (!proxyOnlyMode && upstreamProxyConfig == null) {
+        if (connectionMode == ConnectionMode.tunnel &&
+            upstreamProxyConfig == null) {
           // Under the tunnel the edge dial itself must bypass wintun and must
-          // use a literal address: resolving by hostname would answer a
+          // use a literal address: resolving by hostname would return a
           // mapdns fake IP and loop the upstream connection back into the
-          // tunnel.
-          final literal = await RouteManager.instance.ensureBypassHost(
-            edgeAddress ?? target.host,
-          );
-          if (literal != null) edgeAddress = literal;
-        }
-
-        if (!proxyOnlyMode) {
-          // Under the tunnel the edge dial itself must bypass wintun, and a
-          // hostname could resolve to a mapdns fake IP — force a real,
-          // bypass-routed literal whenever one is discoverable.
+          // tunnel causing a deadlock.
           final literal = await RouteManager.instance.ensureBypassHost(
             edgeAddress ?? target.host,
           );
@@ -674,6 +707,24 @@ class VpnController extends ChangeNotifier {
 
       _ensureGenerationCurrent(myGeneration);
 
+      // Only now — after the upstream tunnel is proven — is it safe to send
+      // the system's traffic into it. Doing this before the dial leaves every
+      // reconnect without a working path (the handshake failures in the log).
+      if (connectionMode == ConnectionMode.tunnel) {
+        await Future<void>.delayed(
+          const Duration(milliseconds: _postTunSettleMs),
+        );
+        await RouteManager.instance.takeoverRoutes(
+          customDnsServer: customDnsServer,
+        );
+        _ensureGenerationCurrent(myGeneration);
+        AppLogger.i(
+          _tag,
+          'connect: route + DNS takeover complete — all system traffic is '
+          'now routed through the tunnel',
+        );
+      }
+
       final establishedCandidate = activeCandidate();
       if (establishedCandidate.authority == primaryCandidate.authority) {
         proxyStateStore.save(primaryCandidate);
@@ -706,9 +757,8 @@ class VpnController extends ChangeNotifier {
         }());
       }
 
-      if (!proxyOnlyMode) {
-        _startSpeedUpdates(socks);
-      }
+      // Always start speed updates regardless of mode.
+      _startSpeedUpdates(socks);
 
       unawaited(
         _watchdogLoop(
@@ -716,6 +766,7 @@ class VpnController extends ChangeNotifier {
           dialUpstream,
           rotateCandidate,
           connectedLabel,
+          tunnelMode: connectionMode == ConnectionMode.tunnel,
         ),
       );
     } on _SupersededException {
@@ -825,14 +876,36 @@ class VpnController extends ChangeNotifier {
     int myGeneration,
     Future<H2UpstreamSession> Function() dialUpstream,
     Future<bool> Function() rotateCandidate,
-    ({VpnStatusKind kind, String detail}) Function() connectedLabel,
-  ) async {
+    ({VpnStatusKind kind, String detail}) Function() connectedLabel, {
+    required bool tunnelMode,
+  }) async {
     var consecutiveFailures = 0;
     var waitingForNetwork = false;
 
     while (_generation == myGeneration) {
       await Future<void>.delayed(_watchdogInterval);
       if (_generation != myGeneration) return;
+
+      // Checked before the session health below on purpose: the upstream
+      // session rides /32 bypass routes on the physical gateway, so it stays
+      // perfectly healthy after hev-socks5-tunnel dies. Without this the app
+      // would keep reporting Connected while the wintun adapter is gone
+      // (traffic leaking out the physical default route) and system DNS is
+      // still hijacked to the tunnel's resolver.
+      if (tunnelMode && !HevSocks5Tunnel.isRunning) {
+        AppLogger.e(
+          _tag,
+          'the tunnel engine is no longer running; disconnecting instead of '
+          'leaking traffic',
+        );
+        _lastError =
+            'The tunnel engine stopped unexpectedly. Traffic was routed '
+            'outside the VPN, so the connection was closed — connect again '
+            'to retry.';
+        ++_generation;
+        await _teardownAfterFailure();
+        return;
+      }
 
       final current = _upstreamSession;
       if (current != null && current.isConnected) {
@@ -890,13 +963,13 @@ class VpnController extends ChangeNotifier {
             '${_friendlyErrorMessage(error)}',
           );
           _lastError = _friendlyErrorMessage(error);
+          // Bump the generation first so _teardownAfterFailure (and the
+          // stillOurs check inside _releaseResources) knows the OS takeover
+          // still belongs to us: without this the routes, the DNS hijack, the
+          // tunnel process and the system proxy are left behind while the UI
+          // already reports Disconnected.
           ++_generation;
-          await _releaseResources(myGeneration);
-          _set(
-            state: ConnectionState.disconnected,
-            statusKind: VpnStatusKind.disconnected,
-            statusDetail: '',
-          );
+          await _teardownAfterFailure();
           return;
         }
         consecutiveFailures++;
@@ -1046,9 +1119,7 @@ class VpnController extends ChangeNotifier {
       _tag,
       'connect: no server previously selected; auto-selecting recommended location',
     );
-    final countries = await ServerListClient().fetchCountries().timeout(
-      _serverListFetchTimeout,
-    );
+    final countries = await ServerListStore.instance.forConnect();
     _ensureGenerationCurrent(myGeneration);
     final random = Random();
     final recommended = ServerListClient.candidatesForCountry(
@@ -1087,33 +1158,20 @@ class VpnController extends ChangeNotifier {
   Future<List<ProxyCandidate>> _discoverAlternateCandidates(
     ProxyCandidate primary,
   ) async {
-    try {
-      final countries = await ServerListClient().fetchCountries().timeout(
-        _serverListFetchTimeout,
-      );
-      final sameCity = ServerListClient.candidatesForCity(
-        countries,
-        primary.countryCode,
-        primary.cityCode,
-      );
-      final sameCountry = ServerListClient.candidatesForCountry(
-        countries,
-        primary.countryCode,
-      );
-      final seen = <String>{};
-      return [...sameCity, ...sameCountry]
-          .where(
-            (c) => c.authority != primary.authority && seen.add(c.authority),
-          )
-          .toList();
-    } catch (failure) {
-      AppLogger.w(
-        _tag,
-        'could not fetch alternate edges; staying with ${primary.authority}',
-        failure,
-      );
-      return [];
-    }
+    final countries = await ServerListStore.instance.forConnect();
+    final sameCity = ServerListClient.candidatesForCity(
+      countries,
+      primary.countryCode,
+      primary.cityCode,
+    );
+    final sameCountry = ServerListClient.candidatesForCountry(
+      countries,
+      primary.countryCode,
+    );
+    final seen = <String>{};
+    return [...sameCity, ...sameCountry]
+        .where((c) => c.authority != primary.authority && seen.add(c.authority))
+        .toList();
   }
 
   Future<String?> _resolveEdgeAddress(
@@ -1180,6 +1238,8 @@ class VpnController extends ChangeNotifier {
     _localProxyEndpoint = null;
     final session = _upstreamSession;
     _upstreamSession = null;
+    final dialer = _directDialer;
+    _directDialer = null;
 
     // Only stop the OS-level pieces if no newer connect took over meanwhile.
     final stillOurs =
@@ -1200,6 +1260,13 @@ class VpnController extends ChangeNotifier {
         AppLogger.w(_tag, 'error stopping the local SOCKS5 server', e);
       }
     }
+    if (dialer != null) {
+      if (dialer.flows > 0 || dialer.failures > 0) {
+        AppLogger.i(_tag, 'split tunneling: ${dialer.summary}');
+      }
+      // RouteManager.disable() below removes the host routes themselves.
+      await dialer.close();
+    }
     if (stillOurs) {
       try {
         await SystemProxyManager.instance.restore();
@@ -1207,6 +1274,9 @@ class VpnController extends ChangeNotifier {
         AppLogger.w(_tag, 'error restoring the Windows system proxy', e);
       }
       ControlPlaneHttp.useProxy(socks5: false);
+      // The bypass routes below are about to be removed, so the control
+      // plane must go back to the system resolver in the same breath.
+      ControlPlaneHttp.useBypassResolver(null);
       // Undo the OS takeover while the wintun adapter still exists, then
       // stop the engine, then drop the bypass routes.
       try {

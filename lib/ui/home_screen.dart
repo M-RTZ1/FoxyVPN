@@ -5,6 +5,7 @@ import '../core/app_version.dart';
 import '../core/byte_format.dart';
 import '../data/models.dart';
 import '../data/proxy_state_store.dart';
+import '../data/settings_store.dart';
 import '../data/token_store.dart';
 import '../data/update_checker.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -70,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
       animation: Listenable.merge([
         _vpn,
         ProxyStateStore.instance,
+        SettingsStore.instance,
         UpdateChecker.instance,
       ]),
       builder: (context, _) {
@@ -107,7 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 6),
                 Text(
                   switch (state) {
-                    ConnectionState.connected => _locationLabel(selected, l10n),
+                    ConnectionState.connected => _connectedSubtitle(
+                      selected,
+                      l10n,
+                    ),
                     ConnectionState.connecting => l10n.homeEstablishingTunnel,
                     ConnectionState.disconnected => l10n.homeTrafficUnprotected,
                   },
@@ -182,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _QuotaCard(vpn: _vpn),
                 const SizedBox(height: 12),
                 _ServerCard(selected: selected),
+                _SplitTunnelCard(vpn: _vpn),
                 const SizedBox(height: 24),
               ],
             ),
@@ -191,13 +197,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _connectedSubtitle(ProxyCandidate? selected, AppLocalizations l10n) {
+    return switch (_vpn.statusKind) {
+      // Tunnel mode shows the exit country/city.
+      VpnStatusKind.tunnelActive => _locationLabel(selected, l10n),
+      // Proxy modes show the local address.
+      VpnStatusKind.systemProxyActive ||
+      VpnStatusKind.proxyActive =>
+        l10n.homeLocalProxy(_vpn.statusDetail),
+      _ => '',
+    };
+  }
+
   String _statusText(AppLocalizations l10n) {
     return switch (_vpn.statusKind) {
       VpnStatusKind.disconnected => l10n.statusDisconnected,
       VpnStatusKind.connecting => l10n.statusConnecting,
       VpnStatusKind.waitingForNetwork => l10n.statusWaitingForNetwork,
       VpnStatusKind.reconnecting => l10n.statusReconnecting,
-      VpnStatusKind.connectedVpn => l10n.statusConnectedVpn(_vpn.statusDetail),
+      VpnStatusKind.tunnelActive => l10n.statusTunnelActive(_vpn.statusDetail),
+      VpnStatusKind.systemProxyActive =>
+        l10n.statusSystemProxyActive(_vpn.statusDetail),
       VpnStatusKind.proxyActive => l10n.statusProxyActive(_vpn.statusDetail),
     };
   }
@@ -318,7 +338,7 @@ class _UpdateCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              l10n.updateAvailableBody(AppVersion.number),
+              l10n.updateAvailableBody(AppVersion.full),
               style: TextStyle(
                 fontSize: 12,
                 color: scheme.onSecondaryContainer,
@@ -500,6 +520,39 @@ class _ServerCard extends StatelessWidget {
         title: Text(country),
         subtitle: Text(
           details,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+      ),
+    );
+  }
+}
+
+/// Confirms that the rule engine is armed, and how much traffic it has moved
+/// around the tunnel during this session.
+class _SplitTunnelCard extends StatelessWidget {
+  const _SplitTunnelCard({required this.vpn});
+
+  final VpnController vpn;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = SettingsStore.instance;
+    if (!settings.splitTunnelEnabled) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      child: ListTile(
+        dense: true,
+        leading: Icon(Icons.alt_route, size: 20, color: scheme.primary),
+        title: Text(
+          l10n.homeSplitTunnelRules(settings.splitTunnelRules.length),
+          style: const TextStyle(fontSize: 13),
+        ),
+        subtitle: Text(
+          l10n.homeSplitTunnelBypassed(vpn.directFlowCount),
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),

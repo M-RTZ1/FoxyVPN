@@ -1,0 +1,8 @@
+name: flutter
+description: >-
+  Minimal stub of the flutter SDK package, used only by tool/verify_fix.dart so
+  the pure-Dart VPN libraries can be exercised on a plain Dart VM (the real
+  flutter package requires dart:ui, which is unavailable outside the engine).
+version: 0.0.0
+environment:
+  sdk: ">=3.0.0 <4.0.0"

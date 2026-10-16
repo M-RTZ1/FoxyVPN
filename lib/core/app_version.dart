@@ -15,11 +15,9 @@ class AppVersion {
   /// pubspec's `version:` field, e.g. `1.0.0+3`.
   static String _full = _fallback;
 
-  /// `1.0.0+3`
+  /// `1.0.0+3` — also what a GitHub release tag is compared against, since
+  /// this project ships build-number-only updates.
   static String get full => _full;
-
-  /// `1.0.0` — what a GitHub release tag is compared against.
-  static String get number => _full.split('+').first;
 
   /// Reads the bundled pubspec; call it before `runApp`. Until it completes
   /// the getters report `0.0.0`.

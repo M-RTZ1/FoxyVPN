@@ -129,6 +129,9 @@ class EdgeAddressResolver {
         Uri.parse(endpoint),
         headers: {'Accept': _dnsMessageContentType},
         body: query,
+        // DoH servers reject the POST outright (HTTP 415) without it: the body
+        // is a wire DNS message, not text.
+        contentType: _dnsMessageContentType,
         timeout: _callTimeout,
       );
       if (!response.isSuccessful) {

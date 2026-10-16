@@ -46,20 +46,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusReconnecting => 'Reconnecting…';
 
   @override
-  String statusConnectedVpn(String country) {
-    return 'Connected • $country';
+  String statusTunnelActive(String country) {
+    return 'Tunnel • $country';
+  }
+
+  @override
+  String statusSystemProxyActive(String address) {
+    return 'System proxy • $address';
   }
 
   @override
   String statusProxyActive(String address) {
-    return 'Proxy active • $address';
+    return 'Proxy • $address';
   }
 
   @override
-  String get homeEstablishingTunnel => 'Establishing the tunnel…';
+  String get homeEstablishingTunnel => 'Establishing the connection…';
 
   @override
   String get homeTrafficUnprotected => 'Your traffic is not protected';
+
+  @override
+  String homeLocalProxy(String address) {
+    return 'Local proxy at $address';
+  }
 
   @override
   String get statDownload => 'Download';
@@ -83,6 +93,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoSelectedLocation => 'Auto-selected location';
+
+  @override
+  String homeSplitTunnelRules(int count) {
+    return '$count split-tunnel rule(s) armed';
+  }
+
+  @override
+  String homeSplitTunnelBypassed(int count) {
+    return '$count connection(s) went around the VPN';
+  }
 
   @override
   String exitLocation(String location) {
@@ -156,6 +176,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serversNoneAvailable => 'No locations are available right now.';
 
   @override
+  String get serversBundledSnapshot =>
+      'The live server list could not be reached, so the copy bundled with the app is shown. It may be outdated.';
+
+  @override
   String get serversNoServers => 'No usable servers in this country.';
 
   @override
@@ -169,6 +193,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get serversPinging => 'pinging…';
+
+  @override
+  String get serversPingUnavailable => 'ping unavailable';
+
+  @override
+  String serversPingResult(int ms) {
+    return '$ms ms';
+  }
+
+  @override
   String get serversTryAgain => 'Try again';
 
   @override
@@ -179,6 +214,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sectionConnection => 'Connection';
+
+  @override
+  String get sectionConnectionMode => 'Connection mode';
+
+  @override
+  String get connectionModeProxy => 'Proxy';
+
+  @override
+  String get connectionModeSystemProxy => 'System proxy';
+
+  @override
+  String get connectionModeTunnel => 'Tunnel';
+
+  @override
+  String get connectionModeProxyDesc =>
+      'Only apps manually configured to use the local proxy (127.0.0.1:21080) are routed through the VPN.';
+
+  @override
+  String get connectionModeSystemProxyDesc =>
+      'Windows system proxy is set automatically so most apps (browsers, etc.) route through the VPN without manual configuration.';
+
+  @override
+  String get connectionModeTunnelDesc =>
+      'Full system-wide VPN: all traffic is routed through the tunnel via a Wintun adapter. Requires running as Administrator.';
 
   @override
   String get sectionLocalProxy => 'Local proxy (SOCKS5 + HTTP)';
@@ -216,20 +275,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get exitCheckSubtitle =>
       'Verify the exit country after connecting and log a warning on mismatch';
-
-  @override
-  String get proxyOnlyTitle => 'Proxy-only mode';
-
-  @override
-  String get proxyOnlySubtitle =>
-      'Expose only the local proxy; no wintun adapter, no admin rights needed';
-
-  @override
-  String get systemProxyTitle => 'Set as Windows system proxy';
-
-  @override
-  String get systemProxySubtitle =>
-      'While connected, point Windows (and every app that honours it) at the local HTTP proxy; reverted on disconnect';
 
   @override
   String get dohTitle => 'DNS-over-HTTPS resolver (for edge resolution)';
@@ -275,6 +320,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorInvalidPort => 'Invalid port number';
+
+  @override
+  String get sectionSplitTunnel => 'Split tunneling';
+
+  @override
+  String get splitTunnelTitle => 'Split tunneling by destination';
+
+  @override
+  String get splitTunnelSubtitle =>
+      'Send chosen domains and address ranges around the VPN. Per-app rules are not possible: the tunnel cannot see which process opened a connection.';
+
+  @override
+  String get splitTunnelDefaultTitle => 'Traffic that matches no rule';
+
+  @override
+  String get splitTunnelActionTunnel => 'Via VPN';
+
+  @override
+  String get splitTunnelActionDirect => 'Bypass VPN';
+
+  @override
+  String get splitTunnelActionLabel => 'Action for the rule you add next';
+
+  @override
+  String get splitTunnelPatternLabel => 'Domain or address';
+
+  @override
+  String get splitTunnelPatternHelper =>
+      'e.g. .ir, example.com, 203.0.113.7 or 192.168.0.0/16';
+
+  @override
+  String get splitTunnelAddRule => 'Add rule';
+
+  @override
+  String get splitTunnelInvalidPattern => 'Not a usable domain or address';
+
+  @override
+  String get splitTunnelNoRules =>
+      'No rules yet. Add a TLD such as .ir, a hostname, or an IPv4 range.';
+
+  @override
+  String get splitTunnelDeleteRule => 'Remove this rule';
+
+  @override
+  String get splitTunnelApplyHint =>
+      'Rules apply to new connections. IPv4 only: the tunnel carries no IPv6 traffic, so IPv6 already leaves the VPN.';
 
   @override
   String get upstreamTitle => 'Use an upstream proxy';

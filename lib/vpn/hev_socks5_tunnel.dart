@@ -14,9 +14,20 @@ class HevSocks5Tunnel {
   HevSocks5Tunnel._();
 
   static const String fileName = 'hev-socks5-tunnel.yaml';
+
+  /// wintun needs an adapter name — without `tunnel.name` the engine crashes
+  /// with an access violation instead of failing cleanly. RouteManager locates
+  /// the adapter by [tunAddress], so the name is ours to choose.
+  static const String tunName = 'FoxyVPN';
   static const String tunAddress = '10.8.0.2';
   static const int tunMtu = 8500;
   static const String mapdnsAddress = '198.18.0.2';
+
+  /// 0xC0000005 reported as the signed process exit code Windows returns.
+  static const int accessViolation = -1073741819;
+
+  static String _formatExitCode(int code) =>
+      '$code (0x${code.toUnsigned(32).toRadixString(16)})';
 
   static Process? _process;
   static StreamSubscription<String>? _stdoutSub;
@@ -74,6 +85,7 @@ mapdns:
 
     final yaml = '''
 tunnel:
+  name: '$tunName'
   mtu: $tunMtu
   ipv4: '$tunAddress'
   icmp: 'reply'
@@ -117,18 +129,26 @@ misc:
           .transform(const SystemEncoding().decoder)
           .transform(const LineSplitter())
           .listen((String line) => AppLogger.w(_tag, 'hev: $line'));
+      int? exitEarlyCode;
       unawaited(process.exitCode.then((code) {
         if (identical(_process, process)) {
-          AppLogger.w(_tag, 'the tunnel process exited with code $code');
+          AppLogger.w(_tag,
+              'the tunnel process exited with code ${_formatExitCode(code)}');
           _process = null;
+          exitEarlyCode = code;
         }
       }));
       // Give wintun a moment to create the adapter.
       await Future<void>.delayed(const Duration(milliseconds: 500));
       if (_process == null) {
+        final code = exitEarlyCode;
         AppLogger.e(_tag,
-            'the tunnel process exited immediately (is the wintun driver '
-            'installed and the app running as administrator?)');
+            'the tunnel process exited immediately'
+            '${code == null ? '' : ' with code ${_formatExitCode(code)}'}: '
+            '${code == accessViolation ? 'wintun crashed while creating the '
+                'adapter (check the tunnel: section of the config)'
+                : 'is the wintun driver installed and the app running as '
+                    'administrator?'}');
         return false;
       }
       AppLogger.i(_tag, 'tunnel process started (pid ${process.pid})');

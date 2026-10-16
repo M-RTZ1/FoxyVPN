@@ -170,22 +170,28 @@ abstract class AppLocalizations {
   /// **'Reconnecting…'**
   String get statusReconnecting;
 
-  /// No description provided for @statusConnectedVpn.
+  /// No description provided for @statusTunnelActive.
   ///
   /// In en, this message translates to:
-  /// **'Connected • {country}'**
-  String statusConnectedVpn(String country);
+  /// **'Tunnel • {country}'**
+  String statusTunnelActive(String country);
+
+  /// No description provided for @statusSystemProxyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'System proxy • {address}'**
+  String statusSystemProxyActive(String address);
 
   /// No description provided for @statusProxyActive.
   ///
   /// In en, this message translates to:
-  /// **'Proxy active • {address}'**
+  /// **'Proxy • {address}'**
   String statusProxyActive(String address);
 
   /// No description provided for @homeEstablishingTunnel.
   ///
   /// In en, this message translates to:
-  /// **'Establishing the tunnel…'**
+  /// **'Establishing the connection…'**
   String get homeEstablishingTunnel;
 
   /// No description provided for @homeTrafficUnprotected.
@@ -193,6 +199,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your traffic is not protected'**
   String get homeTrafficUnprotected;
+
+  /// No description provided for @homeLocalProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'Local proxy at {address}'**
+  String homeLocalProxy(String address);
 
   /// No description provided for @statDownload.
   ///
@@ -229,6 +241,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto-selected location'**
   String get autoSelectedLocation;
+
+  /// No description provided for @homeSplitTunnelRules.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} split-tunnel rule(s) armed'**
+  String homeSplitTunnelRules(int count);
+
+  /// No description provided for @homeSplitTunnelBypassed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} connection(s) went around the VPN'**
+  String homeSplitTunnelBypassed(int count);
 
   /// No description provided for @exitLocation.
   ///
@@ -356,6 +380,12 @@ abstract class AppLocalizations {
   /// **'No locations are available right now.'**
   String get serversNoneAvailable;
 
+  /// No description provided for @serversBundledSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'The live server list could not be reached, so the copy bundled with the app is shown. It may be outdated.'**
+  String get serversBundledSnapshot;
+
   /// No description provided for @serversNoServers.
   ///
   /// In en, this message translates to:
@@ -373,6 +403,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'port {port}'**
   String serversPort(int port);
+
+  /// No description provided for @serversPinging.
+  ///
+  /// In en, this message translates to:
+  /// **'pinging…'**
+  String get serversPinging;
+
+  /// No description provided for @serversPingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'ping unavailable'**
+  String get serversPingUnavailable;
+
+  /// No description provided for @serversPingResult.
+  ///
+  /// In en, this message translates to:
+  /// **'{ms} ms'**
+  String serversPingResult(int ms);
 
   /// No description provided for @serversTryAgain.
   ///
@@ -397,6 +445,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connection'**
   String get sectionConnection;
+
+  /// No description provided for @sectionConnectionMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection mode'**
+  String get sectionConnectionMode;
+
+  /// No description provided for @connectionModeProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy'**
+  String get connectionModeProxy;
+
+  /// No description provided for @connectionModeSystemProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'System proxy'**
+  String get connectionModeSystemProxy;
+
+  /// No description provided for @connectionModeTunnel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tunnel'**
+  String get connectionModeTunnel;
+
+  /// No description provided for @connectionModeProxyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Only apps manually configured to use the local proxy (127.0.0.1:21080) are routed through the VPN.'**
+  String get connectionModeProxyDesc;
+
+  /// No description provided for @connectionModeSystemProxyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows system proxy is set automatically so most apps (browsers, etc.) route through the VPN without manual configuration.'**
+  String get connectionModeSystemProxyDesc;
+
+  /// No description provided for @connectionModeTunnelDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Full system-wide VPN: all traffic is routed through the tunnel via a Wintun adapter. Requires running as Administrator.'**
+  String get connectionModeTunnelDesc;
 
   /// No description provided for @sectionLocalProxy.
   ///
@@ -469,30 +559,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Verify the exit country after connecting and log a warning on mismatch'**
   String get exitCheckSubtitle;
-
-  /// No description provided for @proxyOnlyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Proxy-only mode'**
-  String get proxyOnlyTitle;
-
-  /// No description provided for @proxyOnlySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Expose only the local proxy; no wintun adapter, no admin rights needed'**
-  String get proxyOnlySubtitle;
-
-  /// No description provided for @systemProxyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Set as Windows system proxy'**
-  String get systemProxyTitle;
-
-  /// No description provided for @systemProxySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'While connected, point Windows (and every app that honours it) at the local HTTP proxy; reverted on disconnect'**
-  String get systemProxySubtitle;
 
   /// No description provided for @dohTitle.
   ///
@@ -577,6 +643,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid port number'**
   String get errorInvalidPort;
+
+  /// No description provided for @sectionSplitTunnel.
+  ///
+  /// In en, this message translates to:
+  /// **'Split tunneling'**
+  String get sectionSplitTunnel;
+
+  /// No description provided for @splitTunnelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Split tunneling by destination'**
+  String get splitTunnelTitle;
+
+  /// No description provided for @splitTunnelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send chosen domains and address ranges around the VPN. Per-app rules are not possible: the tunnel cannot see which process opened a connection.'**
+  String get splitTunnelSubtitle;
+
+  /// No description provided for @splitTunnelDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic that matches no rule'**
+  String get splitTunnelDefaultTitle;
+
+  /// No description provided for @splitTunnelActionTunnel.
+  ///
+  /// In en, this message translates to:
+  /// **'Via VPN'**
+  String get splitTunnelActionTunnel;
+
+  /// No description provided for @splitTunnelActionDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass VPN'**
+  String get splitTunnelActionDirect;
+
+  /// No description provided for @splitTunnelActionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Action for the rule you add next'**
+  String get splitTunnelActionLabel;
+
+  /// No description provided for @splitTunnelPatternLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Domain or address'**
+  String get splitTunnelPatternLabel;
+
+  /// No description provided for @splitTunnelPatternHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. .ir, example.com, 203.0.113.7 or 192.168.0.0/16'**
+  String get splitTunnelPatternHelper;
+
+  /// No description provided for @splitTunnelAddRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Add rule'**
+  String get splitTunnelAddRule;
+
+  /// No description provided for @splitTunnelInvalidPattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a usable domain or address'**
+  String get splitTunnelInvalidPattern;
+
+  /// No description provided for @splitTunnelNoRules.
+  ///
+  /// In en, this message translates to:
+  /// **'No rules yet. Add a TLD such as .ir, a hostname, or an IPv4 range.'**
+  String get splitTunnelNoRules;
+
+  /// No description provided for @splitTunnelDeleteRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this rule'**
+  String get splitTunnelDeleteRule;
+
+  /// No description provided for @splitTunnelApplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules apply to new connections. IPv4 only: the tunnel carries no IPv6 traffic, so IPv6 already leaves the VPN.'**
+  String get splitTunnelApplyHint;
 
   /// No description provided for @upstreamTitle.
   ///

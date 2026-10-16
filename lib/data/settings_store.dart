@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'split_tunnel_rules.dart';
+
 enum UpstreamProxyType { socks5, http }
 
 enum DohProvider {
@@ -28,8 +30,27 @@ enum ThemeModeSetting { system, light, dark }
 
 enum AppLanguage { system, en, fa }
 
+/// The three mutually-exclusive operating modes of the VPN client.
+enum ConnectionMode {
+  /// Only the local SOCKS5/HTTP proxy server runs.
+  /// Applications must be manually configured to use it.
+  proxy,
+
+  /// The local SOCKS5/HTTP proxy runs AND the Windows system-wide proxy
+  /// setting (WinINet) is configured to point at it, so all WinINet-aware
+  /// apps (browsers, etc.) are routed automatically.
+  systemProxy,
+
+  /// Full system-wide VPN tunnel: hev-socks5-tunnel creates a Wintun
+  /// adapter, all IPv4 traffic is rerouted into it, and DNS is hijacked
+  /// through the mapdns engine. Requires administrator privileges.
+  tunnel,
+}
+
 /// Mirrors the Android `SettingsStore`. Windows has no per-app split
-/// tunneling equivalent, so `excludedApps` is intentionally absent.
+/// tunneling equivalent — nothing under the wintun adapter identifies the
+/// process a flow came from — so `excludedApps` is absent and split tunneling
+/// is decided by destination instead: domain suffixes and address ranges.
 class SettingsStore extends ChangeNotifier {
   SettingsStore._();
 
@@ -164,16 +185,95 @@ class SettingsStore extends ChangeNotifier {
   String? get effectiveCustomDnsServer =>
       customDnsEnabled ? customDnsServer : null;
 
-  bool get proxyOnlyMode => _p.getBool('proxy_only_mode') ?? false;
-  set proxyOnlyMode(bool value) {
-    _p.setBool('proxy_only_mode', value);
+  // ---- split tunneling ---------------------------------------------------
+
+  /// When off, every flow is tunnelled exactly as before.
+  bool get splitTunnelEnabled => _p.getBool('split_tunnel_enabled') ?? false;
+  set splitTunnelEnabled(bool value) {
+    _p.setBool('split_tunnel_enabled', value);
+    _splitPolicy = null;
     notifyListeners();
   }
 
-  bool get systemProxyEnabled => _p.getBool('system_proxy_enabled') ?? false;
-  set systemProxyEnabled(bool value) {
-    _p.setBool('system_proxy_enabled', value);
+  /// What to do with a flow that matches no rule. Tunnel by default, so a
+  /// missing rule can never leak traffic onto the plain network.
+  SplitTunnelAction get splitTunnelDefaultAction => SplitTunnelAction.values
+      .firstWhere(
+        (a) => a.name == _p.getString('split_tunnel_default'),
+        orElse: () => SplitTunnelAction.tunnel,
+      );
+  set splitTunnelDefaultAction(SplitTunnelAction value) {
+    _p.setString('split_tunnel_default', value.name);
+    _splitPolicy = null;
     notifyListeners();
+  }
+
+  List<SplitTunnelRule> get splitTunnelRules =>
+      SplitTunnelPolicy.decodeRules(_p.getString('split_tunnel_rules'));
+
+  set splitTunnelRules(List<SplitTunnelRule> rules) {
+    _p.setString('split_tunnel_rules', SplitTunnelPolicy.encodeRules(rules));
+    _splitPolicy = null;
+    notifyListeners();
+  }
+
+  static bool isValidSplitTunnelPattern(String value) =>
+      SplitTunnelRule.parse(value) != null;
+
+  /// The live rule set, or null when split tunneling is off.
+  ///
+  /// Rebuilt only when the stored text changes, because the local proxy asks
+  /// for it on every single connection.
+  SplitTunnelPolicy? splitTunnelPolicy() {
+    if (!splitTunnelEnabled) return null;
+    final signature =
+        '${_p.getString('split_tunnel_rules') ?? ''}'
+        '|${_p.getString('split_tunnel_default') ?? ''}';
+    final cached = _splitPolicy;
+    if (cached != null && _splitPolicySignature == signature) return cached;
+    final policy = SplitTunnelPolicy(
+      rules: splitTunnelRules,
+      defaultAction: splitTunnelDefaultAction,
+      enabled: true,
+    );
+    _splitPolicy = policy;
+    _splitPolicySignature = signature;
+    return policy;
+  }
+
+  SplitTunnelPolicy? _splitPolicy;
+  String _splitPolicySignature = '';
+
+  ConnectionMode get connectionMode {
+    // Migrate from the two legacy boolean flags the first time this is read.
+    _migrateConnectionMode();
+    return ConnectionMode.values.firstWhere(
+      (m) => m.name == _p.getString('connection_mode'),
+      orElse: () => ConnectionMode.tunnel,
+    );
+  }
+
+  set connectionMode(ConnectionMode value) {
+    _p.setString('connection_mode', value.name);
+    notifyListeners();
+  }
+
+  /// One-time migration from the old `proxy_only_mode` / `system_proxy_enabled`
+  /// boolean pair to the unified `connection_mode` string key.
+  void _migrateConnectionMode() {
+    if (_p.getBool('connection_mode_migrated') ?? false) return;
+    _p.setBool('connection_mode_migrated', true);
+    // Only migrate if the old keys were explicitly set.
+    final wasProxyOnly = _p.getBool('proxy_only_mode');
+    final wasSystemProxy = _p.getBool('system_proxy_enabled');
+    if (wasProxyOnly == true && wasSystemProxy == true) {
+      _p.setString('connection_mode', ConnectionMode.systemProxy.name);
+    } else if (wasProxyOnly == true) {
+      _p.setString('connection_mode', ConnectionMode.proxy.name);
+    } else {
+      // Default (full tunnel) or was already in tunnel mode.
+      _p.setString('connection_mode', ConnectionMode.tunnel.name);
+    }
   }
 
   String get customEdgeAddress =>

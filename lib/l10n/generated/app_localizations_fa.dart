@@ -46,20 +46,30 @@ class AppLocalizationsFa extends AppLocalizations {
   String get statusReconnecting => 'اتصال دوباره…';
 
   @override
-  String statusConnectedVpn(String country) {
-    return 'متصل • $country';
+  String statusTunnelActive(String country) {
+    return 'تونل • $country';
+  }
+
+  @override
+  String statusSystemProxyActive(String address) {
+    return 'پراکسی سیستم • $address';
   }
 
   @override
   String statusProxyActive(String address) {
-    return 'پراکسی فعال • $address';
+    return 'پراکسی • $address';
   }
 
   @override
-  String get homeEstablishingTunnel => 'در حال ساخت تونل…';
+  String get homeEstablishingTunnel => 'در حال برقراری اتصال…';
 
   @override
   String get homeTrafficUnprotected => 'ترافیک شما محافظت نمی‌شود';
+
+  @override
+  String homeLocalProxy(String address) {
+    return 'پراکسی محلی روی $address';
+  }
 
   @override
   String get statDownload => 'دانلود';
@@ -83,6 +93,16 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get autoSelectedLocation => 'موقعیت خودکار';
+
+  @override
+  String homeSplitTunnelRules(int count) {
+    return '$count قانون split tunneling آماده است';
+  }
+
+  @override
+  String homeSplitTunnelBypassed(int count) {
+    return '$count اتصال بدون VPN (مستقیم) برقرار شد';
+  }
 
   @override
   String exitLocation(String location) {
@@ -156,6 +176,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get serversNoneAvailable => 'در حال حاضر هیچ موقعیتی در دسترس نیست.';
 
   @override
+  String get serversBundledSnapshot =>
+      'فهرست زندهٔ سرورها در دسترس نبود؛ نسخهٔ همراه برنامه نمایش داده می‌شود و ممکن است قدیمی باشد.';
+
+  @override
   String get serversNoServers => 'هیچ سرور قابل‌استفاده‌ای در این کشور نیست.';
 
   @override
@@ -169,6 +193,17 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get serversPinging => 'در حال پینگ…';
+
+  @override
+  String get serversPingUnavailable => 'پینگ در دسترس نیست';
+
+  @override
+  String serversPingResult(int ms) {
+    return '$ms میلی‌ثانیه';
+  }
+
+  @override
   String get serversTryAgain => 'تلاش دوباره';
 
   @override
@@ -179,6 +214,30 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get sectionConnection => 'اتصال';
+
+  @override
+  String get sectionConnectionMode => 'حالت اتصال';
+
+  @override
+  String get connectionModeProxy => 'پراکسی';
+
+  @override
+  String get connectionModeSystemProxy => 'پراکسی سیستم';
+
+  @override
+  String get connectionModeTunnel => 'تونل';
+
+  @override
+  String get connectionModeProxyDesc =>
+      'فقط برنامه‌هایی که به‌صورت دستی پراکسی محلی (127.0.0.1:21080) را تنظیم کرده‌اند از VPN عبور می‌کنند.';
+
+  @override
+  String get connectionModeSystemProxyDesc =>
+      'پراکسی سیستم ویندوز به‌صورت خودکار تنظیم می‌شود تا اکثر برنامه‌ها (مرورگرها و غیره) بدون پیکربندی دستی از VPN استفاده کنند.';
+
+  @override
+  String get connectionModeTunnelDesc =>
+      'VPN کامل سیستمی: تمام ترافیک از طریق آداپتور Wintun از تونل عبور می‌کند. نیاز به اجرا به‌عنوان Administrator دارد.';
 
   @override
   String get sectionLocalProxy => 'پراکسی محلی (SOCKS5 + HTTP)';
@@ -216,20 +275,6 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get exitCheckSubtitle =>
       'پس از اتصال، کشور خروج را بررسی و در صورت عدم تطابق هشدار ثبت می‌کند';
-
-  @override
-  String get proxyOnlyTitle => 'فقط حالت پراکسی';
-
-  @override
-  String get proxyOnlySubtitle =>
-      'فقط پراکسی محلی اجرا می‌شود؛ بدون adapter وینتون و بدون نیاز به دسترسی ادمین';
-
-  @override
-  String get systemProxyTitle => 'تنظیم به‌عنوان پراکسی سیستم ویندوز';
-
-  @override
-  String get systemProxySubtitle =>
-      'در زمان اتصال، ویندوز و همه‌ی برنامه‌هایی که پراکسی را رعایت می‌کنند روی پراکسی محلی تنظیم می‌شوند؛ پس از قطع، وضعیت قبلی بازمی‌گردد';
 
   @override
   String get dohTitle => 'resolver برای DNS-over-HTTPS (نام edge)';
@@ -275,6 +320,53 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get errorInvalidPort => 'شماره‌ی پورت معتبر نیست';
+
+  @override
+  String get sectionSplitTunnel => 'تونل تفکیکی (Split tunneling)';
+
+  @override
+  String get splitTunnelTitle => 'تونل تفکیکی بر پایه‌ی مقصد';
+
+  @override
+  String get splitTunnelSubtitle =>
+      'دامنه‌ها و بازه‌های آدرس دلخواه را بدون VPN ارسال کنید. تفکیک بر پایه‌ی برنامه ممکن نیست، چون tunnel نمی‌فهمد کدام برنامه اتصال را باز کرده است.';
+
+  @override
+  String get splitTunnelDefaultTitle => 'ترافیکی که به هیچ قاعده‌ای نمی‌خورد';
+
+  @override
+  String get splitTunnelActionTunnel => 'از VPN';
+
+  @override
+  String get splitTunnelActionDirect => 'بدون VPN';
+
+  @override
+  String get splitTunnelActionLabel =>
+      'عمل قاعده‌ای که افزودن آن را شروع کرده‌اید';
+
+  @override
+  String get splitTunnelPatternLabel => 'دامنه یا نشانی';
+
+  @override
+  String get splitTunnelPatternHelper =>
+      'مثلاً .ir یا example.com یا 203.0.113.7 یا 192.168.0.0/16';
+
+  @override
+  String get splitTunnelAddRule => 'افزودن قاعده';
+
+  @override
+  String get splitTunnelInvalidPattern => 'دامنه یا نشانی قابل‌استفاده نیست';
+
+  @override
+  String get splitTunnelNoRules =>
+      'هنوز قاعده‌ای نیست. یک TLD مثل .ir، یک دامنه یا یک بازه‌ی IPv4 اضافه کنید.';
+
+  @override
+  String get splitTunnelDeleteRule => 'حذف این قاعده';
+
+  @override
+  String get splitTunnelApplyHint =>
+      'قاعده‌ها روی اتصال‌های تازه اعمال می‌شوند. فقط IPv4: تونل مسیر IPv6 را ندارد، پس ترافیک IPv6 از قبل بدون VPN می‌رود.';
 
   @override
   String get upstreamTitle => 'استفاده از پراکسی بالادستی';

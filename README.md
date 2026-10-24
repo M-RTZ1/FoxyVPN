@@ -47,9 +47,12 @@ FoxyVPN uses a Firefox account and Mozilla's VPN infrastructure to provide VPN a
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/140d3437-81a8-4d9d-bd9c-b8933fc3a85f" width="30%" alt="Home">
-  <img src="https://github.com/user-attachments/assets/4d9797df-6338-4e8b-8083-9abb339f0e7e" width="30%" alt="Server">
-  <img src="https://github.com/user-attachments/assets/6be6a236-6d5e-4eef-9c88-7c3237495116" width="30%" alt="Settings">
+  <img src="<img width="425" height="953" alt="image" src="https://github.com/user-attachments/assets/e88c85ad-1903-440f-b81a-846bbe0abd8a" />
+" width="30%" alt="Home">
+  <img src="<img width="430" height="954" alt="image" src="https://github.com/user-attachments/assets/cb7acd35-75ce-45ed-900b-9227122ce7de" />
+" width="30%" alt="Server">
+  <img src="<img width="424" height="951" alt="image" src="https://github.com/user-attachments/assets/e60f537f-1f17-447e-b1b2-fa2a6b3ae775" />
+" width="30%" alt="Settings">
 </p>
 
 <br>

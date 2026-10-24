@@ -128,6 +128,36 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get actionCancel;
 
+  /// No description provided for @elevationDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Administrator access required'**
+  String get elevationDialogTitle;
+
+  /// No description provided for @elevationDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tunnel mode creates a network adapter and changes system routes and DNS, which Windows allows only with Administrator rights.\n\nFoxyVPN will restart with Administrator access. Proxy and Windows Proxy modes keep running without it.'**
+  String get elevationDialogBody;
+
+  /// No description provided for @elevationContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart as Administrator'**
+  String get elevationContinue;
+
+  /// No description provided for @elevationDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Administrator access was not granted, so Tunnel mode cannot start. Proxy and Windows Proxy modes still work.'**
+  String get elevationDenied;
+
+  /// No description provided for @elevationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'FoxyVPN could not restart with Administrator access.'**
+  String get elevationFailed;
+
   /// No description provided for @actionSignOut.
   ///
   /// In en, this message translates to:
@@ -253,6 +283,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} connection(s) went around the VPN'**
   String homeSplitTunnelBypassed(int count);
+
+  /// No description provided for @dataUsageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data usage'**
+  String get dataUsageTitle;
+
+  /// No description provided for @dataUsageSinceStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Since FoxyVPN started'**
+  String get dataUsageSinceStart;
+
+  /// No description provided for @dataUsageReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset the counters'**
+  String get dataUsageReset;
+
+  /// No description provided for @notificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection notifications'**
+  String get notificationsTitle;
+
+  /// No description provided for @notificationsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a Windows notification when the VPN connects or disconnects'**
+  String get notificationsSubtitle;
+
+  /// No description provided for @minimizeToTrayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize to system tray'**
+  String get minimizeToTrayTitle;
+
+  /// No description provided for @minimizeToTraySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the VPN running in the notification area; use its icon to reopen the window or quit'**
+  String get minimizeToTraySubtitle;
+
+  /// No description provided for @trayTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'FoxyVPN is running'**
+  String get trayTooltip;
+
+  /// No description provided for @trayShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show FoxyVPN'**
+  String get trayShow;
+
+  /// No description provided for @trayQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit FoxyVPN'**
+  String get trayQuit;
+
+  /// No description provided for @notificationConnectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FoxyVPN connected'**
+  String get notificationConnectedTitle;
+
+  /// No description provided for @notificationConnectedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your traffic is now protected.'**
+  String get notificationConnectedBody;
+
+  /// No description provided for @notificationConnectedBodyLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your traffic is now protected • Exit: {location}'**
+  String notificationConnectedBodyLocation(String location);
+
+  /// No description provided for @notificationDisconnectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FoxyVPN disconnected'**
+  String get notificationDisconnectedTitle;
+
+  /// No description provided for @notificationDisconnectedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your traffic is no longer protected.'**
+  String get notificationDisconnectedBody;
 
   /// No description provided for @exitLocation.
   ///
@@ -422,6 +542,18 @@ abstract class AppLocalizations {
   /// **'{ms} ms'**
   String serversPingResult(int ms);
 
+  /// No description provided for @serversSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search countries'**
+  String get serversSearchHint;
+
+  /// No description provided for @serversNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No country matches “{query}”.'**
+  String serversNoMatch(String query);
+
   /// No description provided for @serversTryAgain.
   ///
   /// In en, this message translates to:
@@ -488,6 +620,12 @@ abstract class AppLocalizations {
   /// **'Full system-wide VPN: all traffic is routed through the tunnel via a Wintun adapter. Requires running as Administrator.'**
   String get connectionModeTunnelDesc;
 
+  /// No description provided for @connectionModeProxyOnlyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Tunnel and system proxy modes are Windows-only for now; on this platform FoxyVPN runs the local proxy.'**
+  String get connectionModeProxyOnlyNote;
+
   /// No description provided for @sectionLocalProxy.
   ///
   /// In en, this message translates to:
@@ -497,7 +635,7 @@ abstract class AppLocalizations {
   /// No description provided for @sectionUpstreamProxy.
   ///
   /// In en, this message translates to:
-  /// **'Chain through an upstream proxy'**
+  /// **'Upstream proxy'**
   String get sectionUpstreamProxy;
 
   /// No description provided for @sectionTunnelEngine.
@@ -511,6 +649,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'About'**
   String get sectionAbout;
+
+  /// No description provided for @sectionGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get sectionGeneral;
+
+  /// No description provided for @sectionDns.
+  ///
+  /// In en, this message translates to:
+  /// **'DNS'**
+  String get sectionDns;
+
+  /// No description provided for @sectionAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get sectionAdvanced;
+
+  /// No description provided for @advancedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local proxy, pinned edge and the tunnel engine'**
+  String get advancedSubtitle;
 
   /// No description provided for @themeAuto.
   ///
@@ -551,14 +713,68 @@ abstract class AppLocalizations {
   /// No description provided for @exitCheckTitle.
   ///
   /// In en, this message translates to:
-  /// **'Exit check'**
+  /// **'Connection test after connecting'**
   String get exitCheckTitle;
 
   /// No description provided for @exitCheckSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify the exit country after connecting and log a warning on mismatch'**
+  /// **'Fetch a small HTTPS page through the VPN, show the exit country, and log a warning on mismatch'**
   String get exitCheckSubtitle;
+
+  /// No description provided for @connectionTestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test'**
+  String get connectionTestTitle;
+
+  /// No description provided for @connectionTestIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that traffic actually reaches the internet through the VPN.'**
+  String get connectionTestIdle;
+
+  /// No description provided for @connectionTestRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing through the VPN…'**
+  String get connectionTestRunning;
+
+  /// No description provided for @connectionTestPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Passed in {ms} ms'**
+  String connectionTestPassed(int ms);
+
+  /// No description provided for @connectionTestPassedWithCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Passed in {ms} ms • Exit: {country}'**
+  String connectionTestPassedWithCountry(int ms, String country);
+
+  /// No description provided for @connectionTestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed: {error}'**
+  String connectionTestFailed(String error);
+
+  /// No description provided for @connectionTestRunAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again'**
+  String get connectionTestRunAgain;
+
+  /// No description provided for @customDnsFallbackNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom DNS {server} did not answer through the VPN, so the built-in resolver is active for this connection.'**
+  String customDnsFallbackNotice(String server);
+
+  /// No description provided for @noticeDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get noticeDismiss;
 
   /// No description provided for @dohTitle.
   ///
@@ -575,7 +791,7 @@ abstract class AppLocalizations {
   /// No description provided for @customDnsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'When on, the TUN interface hands this resolver to apps instead of on-device fake-DNS'**
+  /// **'Hand this resolver to apps instead of the built-in fake-DNS. It must answer DNS over TCP through the tunnel; FoxyVPN falls back automatically when it cannot'**
   String get customDnsSubtitle;
 
   /// No description provided for @customDnsLabel.

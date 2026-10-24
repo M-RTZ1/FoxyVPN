@@ -74,6 +74,23 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# flutter_secure_storage_linux 1.2.x vendors an nlohmann/json whose literal
+# operators trip -Wdeprecated-literal-operator on newer Clang, and plugins are
+# built with -Werror by APPLY_STANDARD_SETTINGS. Feature-test the flag so Clang
+# releases that predate the warning do not receive an unknown option.
+if(TARGET flutter_secure_storage_linux_plugin AND
+   CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  include(CheckCXXSourceCompiles)
+  set(CMAKE_REQUIRED_FLAGS "-Werror -Wno-deprecated-literal-operator")
+  check_cxx_source_compiles("int main() { return 0; }"
+    FOXYVPN_HAS_WNO_DEPRECATED_LITERAL_OPERATOR)
+  unset(CMAKE_REQUIRED_FLAGS)
+  if(FOXYVPN_HAS_WNO_DEPRECATED_LITERAL_OPERATOR)
+    target_compile_options(flutter_secure_storage_linux_plugin
+      PRIVATE -Wno-deprecated-literal-operator)
+  endif()
+endif()
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build

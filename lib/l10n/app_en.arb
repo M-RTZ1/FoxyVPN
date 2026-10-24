@@ -7,6 +7,11 @@
   "navLogs": "Logs",
 
   "actionCancel": "Cancel",
+  "elevationDialogTitle": "Administrator access required",
+  "elevationDialogBody": "Tunnel mode creates a network adapter and changes system routes and DNS, which Windows allows only with Administrator rights.\n\nFoxyVPN will restart with Administrator access. Proxy and Windows Proxy modes keep running without it.",
+  "elevationContinue": "Restart as Administrator",
+  "elevationDenied": "Administrator access was not granted, so Tunnel mode cannot start. Proxy and Windows Proxy modes still work.",
+  "elevationFailed": "FoxyVPN could not restart with Administrator access.",
   "actionSignOut": "Sign out",
   "signOutDialogTitle": "Sign out?",
   "signOutDialogBody": "The tunnel will be disconnected and your Firefox Account session removed from this device.",
@@ -54,6 +59,24 @@
   "@homeSplitTunnelBypassed": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "dataUsageTitle": "Data usage",
+  "dataUsageSinceStart": "Since FoxyVPN started",
+  "dataUsageReset": "Reset the counters",
+  "notificationsTitle": "Connection notifications",
+  "notificationsSubtitle": "Show a Windows notification when the VPN connects or disconnects",
+  "minimizeToTrayTitle": "Minimize to system tray",
+  "minimizeToTraySubtitle": "Keep the VPN running in the notification area; use its icon to reopen the window or quit",
+  "trayTooltip": "FoxyVPN is running",
+  "trayShow": "Show FoxyVPN",
+  "trayQuit": "Quit FoxyVPN",
+  "notificationConnectedTitle": "FoxyVPN connected",
+  "notificationConnectedBody": "Your traffic is now protected.",
+  "notificationConnectedBodyLocation": "Your traffic is now protected • Exit: {location}",
+  "@notificationConnectedBodyLocation": {
+    "placeholders": { "location": { "type": "String" } }
+  },
+  "notificationDisconnectedTitle": "FoxyVPN disconnected",
+  "notificationDisconnectedBody": "Your traffic is no longer protected.",
   "exitLocation": "Exit location: {location}",
   "@exitLocation": {
     "placeholders": { "location": { "type": "String" } }
@@ -102,6 +125,11 @@
   "@serversPingResult": {
     "placeholders": { "ms": { "type": "int" } }
   },
+  "serversSearchHint": "Search countries",
+  "serversNoMatch": "No country matches “{query}”.",
+  "@serversNoMatch": {
+    "placeholders": { "query": { "type": "String" } }
+  },
   "serversTryAgain": "Try again",
 
   "sectionAppearance": "Appearance",
@@ -114,10 +142,15 @@
   "connectionModeProxyDesc": "Only apps manually configured to use the local proxy (127.0.0.1:21080) are routed through the VPN.",
   "connectionModeSystemProxyDesc": "Windows system proxy is set automatically so most apps (browsers, etc.) route through the VPN without manual configuration.",
   "connectionModeTunnelDesc": "Full system-wide VPN: all traffic is routed through the tunnel via a Wintun adapter. Requires running as Administrator.",
+  "connectionModeProxyOnlyNote": "Tunnel and system proxy modes are Windows-only for now; on this platform FoxyVPN runs the local proxy.",
   "sectionLocalProxy": "Local proxy (SOCKS5 + HTTP)",
-  "sectionUpstreamProxy": "Chain through an upstream proxy",
+  "sectionUpstreamProxy": "Upstream proxy",
   "sectionTunnelEngine": "Tunnel engine",
   "sectionAbout": "About",
+  "sectionGeneral": "General",
+  "sectionDns": "DNS",
+  "sectionAdvanced": "Advanced",
+  "advancedSubtitle": "Local proxy, pinned edge and the tunnel engine",
 
   "themeAuto": "Auto",
   "themeLight": "Light",
@@ -126,11 +159,32 @@
   "languageEnglish": "English",
   "languagePersian": "فارسی",
 
-  "exitCheckTitle": "Exit check",
-  "exitCheckSubtitle": "Verify the exit country after connecting and log a warning on mismatch",
+  "exitCheckTitle": "Connection test after connecting",
+  "exitCheckSubtitle": "Fetch a small HTTPS page through the VPN, show the exit country, and log a warning on mismatch",
+  "connectionTestTitle": "Connection test",
+  "connectionTestIdle": "Check that traffic actually reaches the internet through the VPN.",
+  "connectionTestRunning": "Testing through the VPN…",
+  "connectionTestPassed": "Passed in {ms} ms",
+  "@connectionTestPassed": {
+    "placeholders": { "ms": { "type": "int" } }
+  },
+  "connectionTestPassedWithCountry": "Passed in {ms} ms • Exit: {country}",
+  "@connectionTestPassedWithCountry": {
+    "placeholders": { "ms": { "type": "int" }, "country": { "type": "String" } }
+  },
+  "connectionTestFailed": "Failed: {error}",
+  "@connectionTestFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "connectionTestRunAgain": "Run again",
+  "customDnsFallbackNotice": "Custom DNS {server} did not answer through the VPN, so the built-in resolver is active for this connection.",
+  "@customDnsFallbackNotice": {
+    "placeholders": { "server": { "type": "String" } }
+  },
+  "noticeDismiss": "Dismiss",
   "dohTitle": "DNS-over-HTTPS resolver (for edge resolution)",
   "customDnsTitle": "Custom DNS server for the tunnel",
-  "customDnsSubtitle": "When on, the TUN interface hands this resolver to apps instead of on-device fake-DNS",
+  "customDnsSubtitle": "Hand this resolver to apps instead of the built-in fake-DNS. It must answer DNS over TCP through the tunnel; FoxyVPN falls back automatically when it cannot",
   "customDnsLabel": "Custom DNS server (IPv4)",
   "customDnsHelper": "e.g. 1.1.1.1",
   "errorInvalidDns": "Invalid DNS server address",

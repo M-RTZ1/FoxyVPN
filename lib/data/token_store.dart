@@ -1,13 +1,16 @@
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
 import '../core/app_logger.dart';
 import 'models.dart';
+import 'secure_store.dart';
 
 const String _tag = 'TokenStore';
 
 /// Encrypted-at-rest token storage (DPAPI on Windows via flutter_secure_storage).
+///
+/// Persistence policy lives in [SecureStore]; when the OS keyring is missing
+/// or locked (common on headless Linux) the session is kept in memory for this
+/// run instead of failing the login.
 class TokenStore {
   TokenStore._();
 
@@ -16,17 +19,13 @@ class TokenStore {
   static const String _keyAuth = 'foxyvpn_auth';
   static const int _clockSkewToleranceSeconds = 60;
 
-  static const FlutterSecureStorage _storage = FlutterSecureStorage(
-    wOptions: WindowsOptions(),
-  );
-
   RuntimeAuth? _cached;
 
   Future<void> saveAuth(RuntimeAuth auth) async {
     _cached = auth;
-    await _storage.write(
-      key: _keyAuth,
-      value: jsonEncode({
+    await SecureStore.write(
+      _keyAuth,
+      jsonEncode({
         'access_token': auth.accessToken,
         'refresh_token': auth.refreshToken,
         'expires_at': auth.expiresAtEpochSeconds,
@@ -37,7 +36,7 @@ class TokenStore {
   Future<RuntimeAuth?> loadAuth() async {
     if (_cached != null) return _cached;
     try {
-      final raw = await _storage.read(key: _keyAuth);
+      final raw = await SecureStore.read(_keyAuth);
       if (raw == null || raw.isEmpty) return null;
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final access = json['access_token'] as String?;
@@ -70,6 +69,6 @@ class TokenStore {
 
   Future<void> clear() async {
     _cached = null;
-    await _storage.delete(key: _keyAuth);
+    await SecureStore.delete(_keyAuth);
   }
 }

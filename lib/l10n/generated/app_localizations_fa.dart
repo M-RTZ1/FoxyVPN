@@ -24,6 +24,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get actionCancel => 'انصراف';
 
   @override
+  String get elevationDialogTitle => 'دسترسی Administrator لازم است';
+
+  @override
+  String get elevationDialogBody =>
+      'حالت Tunnel یک network adapter می‌سازد و routeها و DNS سیستم را تغییر می‌دهد؛ Windows این کار را فقط با دسترسی Administrator اجازه می‌دهد.\n\nFoxyVPN با دسترسی Administrator دوباره اجرا می‌شود. حالت‌های Proxy و Windows Proxy بدون این دسترسی کار می‌کنند.';
+
+  @override
+  String get elevationContinue => 'اجرای مجدد با Administrator';
+
+  @override
+  String get elevationDenied =>
+      'دسترسی Administrator داده نشد؛ Tunnel شروع نمی‌شود. حالت‌های Proxy و Windows Proxy همچنان کار می‌کنند.';
+
+  @override
+  String get elevationFailed =>
+      'اجرای مجدد FoxyVPN با دسترسی Administrator ممکن نشد.';
+
+  @override
   String get actionSignOut => 'خروج از حساب';
 
   @override
@@ -103,6 +121,55 @@ class AppLocalizationsFa extends AppLocalizations {
   String homeSplitTunnelBypassed(int count) {
     return '$count اتصال بدون VPN (مستقیم) برقرار شد';
   }
+
+  @override
+  String get dataUsageTitle => 'مصرف داده';
+
+  @override
+  String get dataUsageSinceStart => 'از زمان اجرای FoxyVPN';
+
+  @override
+  String get dataUsageReset => 'صفر کردن شمارنده‌ها';
+
+  @override
+  String get notificationsTitle => 'اعلان‌های اتصال';
+
+  @override
+  String get notificationsSubtitle =>
+      'هنگام اتصال یا قطع‌شدن VPN یک اعلان ویندوز نمایش داده شود';
+
+  @override
+  String get minimizeToTrayTitle => 'کوچک‌کردن به System Tray';
+
+  @override
+  String get minimizeToTraySubtitle =>
+      'VPN در سینی سیستم اجرا می‌ماند؛ با آیکون آن پنجره را باز کنید یا خارج شوید';
+
+  @override
+  String get trayTooltip => 'FoxyVPN در حال اجراست';
+
+  @override
+  String get trayShow => 'نمایش FoxyVPN';
+
+  @override
+  String get trayQuit => 'خروج از FoxyVPN';
+
+  @override
+  String get notificationConnectedTitle => 'FoxyVPN متصل شد';
+
+  @override
+  String get notificationConnectedBody => 'ترافیک شما اکنون محافظت می‌شود.';
+
+  @override
+  String notificationConnectedBodyLocation(String location) {
+    return 'ترافیک شما اکنون محافظت می‌شود • خروج: $location';
+  }
+
+  @override
+  String get notificationDisconnectedTitle => 'FoxyVPN قطع شد';
+
+  @override
+  String get notificationDisconnectedBody => 'ترافیک شما دیگر محافظت نمی‌شود.';
 
   @override
   String exitLocation(String location) {
@@ -204,6 +271,14 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get serversSearchHint => 'جست‌وجوی کشور';
+
+  @override
+  String serversNoMatch(String query) {
+    return 'کشوری با «$query» پیدا نشد.';
+  }
+
+  @override
   String get serversTryAgain => 'تلاش دوباره';
 
   @override
@@ -240,16 +315,32 @@ class AppLocalizationsFa extends AppLocalizations {
       'VPN کامل سیستمی: تمام ترافیک از طریق آداپتور Wintun از تونل عبور می‌کند. نیاز به اجرا به‌عنوان Administrator دارد.';
 
   @override
+  String get connectionModeProxyOnlyNote =>
+      'حالت‌های تونل و پراکسی سیستم فعلاً فقط در ویندوز پشتیبانی می‌شوند؛ روی این پلتفرم FoxyVPN به‌صورت پراکسی محلی کار می‌کند.';
+
+  @override
   String get sectionLocalProxy => 'پراکسی محلی (SOCKS5 + HTTP)';
 
   @override
-  String get sectionUpstreamProxy => 'عبور از پراکسی بالادستی';
+  String get sectionUpstreamProxy => 'پراکسی بالادستی';
 
   @override
   String get sectionTunnelEngine => 'موتور تونل';
 
   @override
   String get sectionAbout => 'درباره';
+
+  @override
+  String get sectionGeneral => 'عمومی';
+
+  @override
+  String get sectionDns => 'DNS';
+
+  @override
+  String get sectionAdvanced => 'پیشرفته';
+
+  @override
+  String get advancedSubtitle => 'پراکسی محلی، edge ثابت و موتور تونل';
 
   @override
   String get themeAuto => 'خودکار';
@@ -270,11 +361,47 @@ class AppLocalizationsFa extends AppLocalizations {
   String get languagePersian => 'فارسی';
 
   @override
-  String get exitCheckTitle => 'بررسی کشور خروج';
+  String get exitCheckTitle => 'تست اتصال پس از برقراری';
 
   @override
   String get exitCheckSubtitle =>
-      'پس از اتصال، کشور خروج را بررسی و در صورت عدم تطابق هشدار ثبت می‌کند';
+      'یک صفحه‌ی کوچک HTTPS را از طریق VPN دریافت می‌کند، کشور خروج را نشان می‌دهد و در صورت عدم تطابق هشدار ثبت می‌کند';
+
+  @override
+  String get connectionTestTitle => 'تست اتصال';
+
+  @override
+  String get connectionTestIdle =>
+      'بررسی کنید که ترافیک واقعاً از طریق VPN به اینترنت می‌رسد.';
+
+  @override
+  String get connectionTestRunning => 'در حال تست از طریق VPN…';
+
+  @override
+  String connectionTestPassed(int ms) {
+    return 'موفق در $ms میلی‌ثانیه';
+  }
+
+  @override
+  String connectionTestPassedWithCountry(int ms, String country) {
+    return 'موفق در $ms میلی‌ثانیه • خروج: $country';
+  }
+
+  @override
+  String connectionTestFailed(String error) {
+    return 'ناموفق: $error';
+  }
+
+  @override
+  String get connectionTestRunAgain => 'اجرای دوباره';
+
+  @override
+  String customDnsFallbackNotice(String server) {
+    return 'DNS سفارشی $server از طریق VPN پاسخ نداد؛ برای این اتصال resolver داخلی فعال است.';
+  }
+
+  @override
+  String get noticeDismiss => 'بستن';
 
   @override
   String get dohTitle => 'resolver برای DNS-over-HTTPS (نام edge)';
@@ -284,7 +411,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get customDnsSubtitle =>
-      'وقتی روشن است، این resolver به‌جای fake-DNS داخلی به برنامه‌ها داده می‌شود';
+      'این resolver به‌جای fake-DNS داخلی به برنامه‌ها داده می‌شود. باید DNS روی TCP را از تونل پاسخ دهد؛ در غیر این صورت FoxyVPN خودکار به resolver داخلی برمی‌گردد';
 
   @override
   String get customDnsLabel => 'سرور DNS سفارشی (IPv4)';

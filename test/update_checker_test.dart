@@ -34,10 +34,10 @@ void main() {
       // This project ships build-only updates (1.0.0+1, 1.0.0+2, ...), so the
       // build number has to break the tie or no update is ever detected.
       expect(
-        UpdateChecker.compareVersions('1.0.0+3', '1.0.0+2'),
+        UpdateChecker.compareVersions('3.0.0+4', '1.0.0+2'),
         greaterThan(0),
       );
-      expect(UpdateChecker.compareVersions('1.0.0+2', '1.0.0+3'), lessThan(0));
+      expect(UpdateChecker.compareVersions('1.0.0+2', '3.0.0+4'), lessThan(0));
       expect(UpdateChecker.compareVersions('1.0.0+2', '1.0.0+2'), 0);
       expect(
         UpdateChecker.compareVersions('v1.2.3+456', '1.2.3'),
@@ -156,15 +156,15 @@ void main() {
         'test/fixtures/github_release_latest.json',
       ).readAsStringSync();
       final release = UpdateChecker.parseRelease(jsonDecode(fixture))!;
-      expect(release.tag, '1.0.0+3');
-      expect(release.version, '1.0.0+3');
+      expect(release.tag, '3.0.0+4');
+      expect(release.version, '3.0.0+4');
       expect(release.prerelease, isFalse);
       expect(release.assetName, 'FoxyVPN.exe');
       expect(release.downloadUrl, endsWith('/FoxyVPN.exe'));
       expect(release.publishedAt, isNotNull);
 
       // The shipped build matches that tag, so nothing is offered.
-      expect(UpdateChecker.compareVersions(release.version, '1.0.0+3'), 0);
+      expect(UpdateChecker.compareVersions(release.version, '3.0.0+4'), 0);
       // The build before it must still count as an update.
       expect(
         UpdateChecker.compareVersions(release.version, '1.0.0+1'),

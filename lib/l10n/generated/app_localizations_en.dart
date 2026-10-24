@@ -24,6 +24,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionCancel => 'Cancel';
 
   @override
+  String get elevationDialogTitle => 'Administrator access required';
+
+  @override
+  String get elevationDialogBody =>
+      'Tunnel mode creates a network adapter and changes system routes and DNS, which Windows allows only with Administrator rights.\n\nFoxyVPN will restart with Administrator access. Proxy and Windows Proxy modes keep running without it.';
+
+  @override
+  String get elevationContinue => 'Restart as Administrator';
+
+  @override
+  String get elevationDenied =>
+      'Administrator access was not granted, so Tunnel mode cannot start. Proxy and Windows Proxy modes still work.';
+
+  @override
+  String get elevationFailed =>
+      'FoxyVPN could not restart with Administrator access.';
+
+  @override
   String get actionSignOut => 'Sign out';
 
   @override
@@ -103,6 +121,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String homeSplitTunnelBypassed(int count) {
     return '$count connection(s) went around the VPN';
   }
+
+  @override
+  String get dataUsageTitle => 'Data usage';
+
+  @override
+  String get dataUsageSinceStart => 'Since FoxyVPN started';
+
+  @override
+  String get dataUsageReset => 'Reset the counters';
+
+  @override
+  String get notificationsTitle => 'Connection notifications';
+
+  @override
+  String get notificationsSubtitle =>
+      'Show a Windows notification when the VPN connects or disconnects';
+
+  @override
+  String get minimizeToTrayTitle => 'Minimize to system tray';
+
+  @override
+  String get minimizeToTraySubtitle =>
+      'Keep the VPN running in the notification area; use its icon to reopen the window or quit';
+
+  @override
+  String get trayTooltip => 'FoxyVPN is running';
+
+  @override
+  String get trayShow => 'Show FoxyVPN';
+
+  @override
+  String get trayQuit => 'Quit FoxyVPN';
+
+  @override
+  String get notificationConnectedTitle => 'FoxyVPN connected';
+
+  @override
+  String get notificationConnectedBody => 'Your traffic is now protected.';
+
+  @override
+  String notificationConnectedBodyLocation(String location) {
+    return 'Your traffic is now protected • Exit: $location';
+  }
+
+  @override
+  String get notificationDisconnectedTitle => 'FoxyVPN disconnected';
+
+  @override
+  String get notificationDisconnectedBody =>
+      'Your traffic is no longer protected.';
 
   @override
   String exitLocation(String location) {
@@ -204,6 +272,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get serversSearchHint => 'Search countries';
+
+  @override
+  String serversNoMatch(String query) {
+    return 'No country matches “$query”.';
+  }
+
+  @override
   String get serversTryAgain => 'Try again';
 
   @override
@@ -240,16 +316,33 @@ class AppLocalizationsEn extends AppLocalizations {
       'Full system-wide VPN: all traffic is routed through the tunnel via a Wintun adapter. Requires running as Administrator.';
 
   @override
+  String get connectionModeProxyOnlyNote =>
+      'Tunnel and system proxy modes are Windows-only for now; on this platform FoxyVPN runs the local proxy.';
+
+  @override
   String get sectionLocalProxy => 'Local proxy (SOCKS5 + HTTP)';
 
   @override
-  String get sectionUpstreamProxy => 'Chain through an upstream proxy';
+  String get sectionUpstreamProxy => 'Upstream proxy';
 
   @override
   String get sectionTunnelEngine => 'Tunnel engine';
 
   @override
   String get sectionAbout => 'About';
+
+  @override
+  String get sectionGeneral => 'General';
+
+  @override
+  String get sectionDns => 'DNS';
+
+  @override
+  String get sectionAdvanced => 'Advanced';
+
+  @override
+  String get advancedSubtitle =>
+      'Local proxy, pinned edge and the tunnel engine';
 
   @override
   String get themeAuto => 'Auto';
@@ -270,11 +363,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languagePersian => 'فارسی';
 
   @override
-  String get exitCheckTitle => 'Exit check';
+  String get exitCheckTitle => 'Connection test after connecting';
 
   @override
   String get exitCheckSubtitle =>
-      'Verify the exit country after connecting and log a warning on mismatch';
+      'Fetch a small HTTPS page through the VPN, show the exit country, and log a warning on mismatch';
+
+  @override
+  String get connectionTestTitle => 'Connection test';
+
+  @override
+  String get connectionTestIdle =>
+      'Check that traffic actually reaches the internet through the VPN.';
+
+  @override
+  String get connectionTestRunning => 'Testing through the VPN…';
+
+  @override
+  String connectionTestPassed(int ms) {
+    return 'Passed in $ms ms';
+  }
+
+  @override
+  String connectionTestPassedWithCountry(int ms, String country) {
+    return 'Passed in $ms ms • Exit: $country';
+  }
+
+  @override
+  String connectionTestFailed(String error) {
+    return 'Failed: $error';
+  }
+
+  @override
+  String get connectionTestRunAgain => 'Run again';
+
+  @override
+  String customDnsFallbackNotice(String server) {
+    return 'Custom DNS $server did not answer through the VPN, so the built-in resolver is active for this connection.';
+  }
+
+  @override
+  String get noticeDismiss => 'Dismiss';
 
   @override
   String get dohTitle => 'DNS-over-HTTPS resolver (for edge resolution)';
@@ -284,7 +413,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customDnsSubtitle =>
-      'When on, the TUN interface hands this resolver to apps instead of on-device fake-DNS';
+      'Hand this resolver to apps instead of the built-in fake-DNS. It must answer DNS over TCP through the tunnel; FoxyVPN falls back automatically when it cannot';
 
   @override
   String get customDnsLabel => 'Custom DNS server (IPv4)';

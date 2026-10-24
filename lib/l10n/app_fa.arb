@@ -7,6 +7,11 @@
   "navLogs": "گزارش‌ها",
 
   "actionCancel": "انصراف",
+  "elevationDialogTitle": "دسترسی Administrator لازم است",
+  "elevationDialogBody": "حالت Tunnel یک network adapter می‌سازد و routeها و DNS سیستم را تغییر می‌دهد؛ Windows این کار را فقط با دسترسی Administrator اجازه می‌دهد.\n\nFoxyVPN با دسترسی Administrator دوباره اجرا می‌شود. حالت‌های Proxy و Windows Proxy بدون این دسترسی کار می‌کنند.",
+  "elevationContinue": "اجرای مجدد با Administrator",
+  "elevationDenied": "دسترسی Administrator داده نشد؛ Tunnel شروع نمی‌شود. حالت‌های Proxy و Windows Proxy همچنان کار می‌کنند.",
+  "elevationFailed": "اجرای مجدد FoxyVPN با دسترسی Administrator ممکن نشد.",
   "actionSignOut": "خروج از حساب",
   "signOutDialogTitle": "خروج از حساب؟",
   "signOutDialogBody": "اتصال قطع می‌شود و نشست Firefox Account شما از این دستگاه حذف می‌شود.",
@@ -30,6 +35,24 @@
   "autoSelectedLocation": "موقعیت خودکار",
   "homeSplitTunnelRules": "{count} قانون split tunneling آماده است",
   "homeSplitTunnelBypassed": "{count} اتصال بدون VPN (مستقیم) برقرار شد",
+  "dataUsageTitle": "مصرف داده",
+  "dataUsageSinceStart": "از زمان اجرای FoxyVPN",
+  "dataUsageReset": "صفر کردن شمارنده‌ها",
+  "notificationsTitle": "اعلان‌های اتصال",
+  "notificationsSubtitle": "هنگام اتصال یا قطع‌شدن VPN یک اعلان ویندوز نمایش داده شود",
+  "minimizeToTrayTitle": "کوچک‌کردن به System Tray",
+  "minimizeToTraySubtitle": "VPN در سینی سیستم اجرا می‌ماند؛ با آیکون آن پنجره را باز کنید یا خارج شوید",
+  "trayTooltip": "FoxyVPN در حال اجراست",
+  "trayShow": "نمایش FoxyVPN",
+  "trayQuit": "خروج از FoxyVPN",
+  "notificationConnectedTitle": "FoxyVPN متصل شد",
+  "notificationConnectedBody": "ترافیک شما اکنون محافظت می‌شود.",
+  "notificationConnectedBodyLocation": "ترافیک شما اکنون محافظت می‌شود • خروج: {location}",
+  "@notificationConnectedBodyLocation": {
+    "placeholders": { "location": { "type": "String" } }
+  },
+  "notificationDisconnectedTitle": "FoxyVPN قطع شد",
+  "notificationDisconnectedBody": "ترافیک شما دیگر محافظت نمی‌شود.",
   "exitLocation": "موقعیت خروج: {location}",
   "serverCardRecommended": "پیشنهادی (خودکار)",
   "serverCardPickLocation": "از بخش سرورها یک موقعیت انتخاب کنید",
@@ -63,6 +86,11 @@
   "@serversPingResult": {
     "placeholders": { "ms": { "type": "int" } }
   },
+  "serversSearchHint": "جست‌وجوی کشور",
+  "serversNoMatch": "کشوری با «{query}» پیدا نشد.",
+  "@serversNoMatch": {
+    "placeholders": { "query": { "type": "String" } }
+  },
   "serversTryAgain": "تلاش دوباره",
 
   "sectionAppearance": "ظاهر",
@@ -75,10 +103,15 @@
   "connectionModeProxyDesc": "فقط برنامه‌هایی که به‌صورت دستی پراکسی محلی (127.0.0.1:21080) را تنظیم کرده‌اند از VPN عبور می‌کنند.",
   "connectionModeSystemProxyDesc": "پراکسی سیستم ویندوز به‌صورت خودکار تنظیم می‌شود تا اکثر برنامه‌ها (مرورگرها و غیره) بدون پیکربندی دستی از VPN استفاده کنند.",
   "connectionModeTunnelDesc": "VPN کامل سیستمی: تمام ترافیک از طریق آداپتور Wintun از تونل عبور می‌کند. نیاز به اجرا به‌عنوان Administrator دارد.",
+  "connectionModeProxyOnlyNote": "حالت‌های تونل و پراکسی سیستم فعلاً فقط در ویندوز پشتیبانی می‌شوند؛ روی این پلتفرم FoxyVPN به‌صورت پراکسی محلی کار می‌کند.",
   "sectionLocalProxy": "پراکسی محلی (SOCKS5 + HTTP)",
-  "sectionUpstreamProxy": "عبور از پراکسی بالادستی",
+  "sectionUpstreamProxy": "پراکسی بالادستی",
   "sectionTunnelEngine": "موتور تونل",
   "sectionAbout": "درباره",
+  "sectionGeneral": "عمومی",
+  "sectionDns": "DNS",
+  "sectionAdvanced": "پیشرفته",
+  "advancedSubtitle": "پراکسی محلی، edge ثابت و موتور تونل",
 
   "themeAuto": "خودکار",
   "themeLight": "روشن",
@@ -87,11 +120,32 @@
   "languageEnglish": "English",
   "languagePersian": "فارسی",
 
-  "exitCheckTitle": "بررسی کشور خروج",
-  "exitCheckSubtitle": "پس از اتصال، کشور خروج را بررسی و در صورت عدم تطابق هشدار ثبت می‌کند",
+  "exitCheckTitle": "تست اتصال پس از برقراری",
+  "exitCheckSubtitle": "یک صفحه‌ی کوچک HTTPS را از طریق VPN دریافت می‌کند، کشور خروج را نشان می‌دهد و در صورت عدم تطابق هشدار ثبت می‌کند",
+  "connectionTestTitle": "تست اتصال",
+  "connectionTestIdle": "بررسی کنید که ترافیک واقعاً از طریق VPN به اینترنت می‌رسد.",
+  "connectionTestRunning": "در حال تست از طریق VPN…",
+  "connectionTestPassed": "موفق در {ms} میلی‌ثانیه",
+  "@connectionTestPassed": {
+    "placeholders": { "ms": { "type": "int" } }
+  },
+  "connectionTestPassedWithCountry": "موفق در {ms} میلی‌ثانیه • خروج: {country}",
+  "@connectionTestPassedWithCountry": {
+    "placeholders": { "ms": { "type": "int" }, "country": { "type": "String" } }
+  },
+  "connectionTestFailed": "ناموفق: {error}",
+  "@connectionTestFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "connectionTestRunAgain": "اجرای دوباره",
+  "customDnsFallbackNotice": "DNS سفارشی {server} از طریق VPN پاسخ نداد؛ برای این اتصال resolver داخلی فعال است.",
+  "@customDnsFallbackNotice": {
+    "placeholders": { "server": { "type": "String" } }
+  },
+  "noticeDismiss": "بستن",
   "dohTitle": "resolver برای DNS-over-HTTPS (نام edge)",
   "customDnsTitle": "سرور DNS سفارشی برای تونل",
-  "customDnsSubtitle": "وقتی روشن است، این resolver به‌جای fake-DNS داخلی به برنامه‌ها داده می‌شود",
+  "customDnsSubtitle": "این resolver به‌جای fake-DNS داخلی به برنامه‌ها داده می‌شود. باید DNS روی TCP را از تونل پاسخ دهد؛ در غیر این صورت FoxyVPN خودکار به resolver داخلی برمی‌گردد",
   "customDnsLabel": "سرور DNS سفارشی (IPv4)",
   "customDnsHelper": "مثلاً 1.1.1.1",
   "errorInvalidDns": "نشانی DNS معتبر نیست",

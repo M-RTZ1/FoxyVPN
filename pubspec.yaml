@@ -1,7 +1,7 @@
 name: foxyvpn
 description: "FoxyVPN for Windows - unofficial Firefox VPN client (Flutter port)."
 publish_to: 'none'
-version: 1.0.0+3
+version: 3.0.0+4
 
 environment:
   sdk: ^3.12.2
@@ -16,15 +16,24 @@ dependencies:
   http: ^1.2.0
   http2: ^2.3.0
   crypto: ^3.0.3
+  flutter_svg: ^2.3.0
   shared_preferences: ^2.2.0
   flutter_secure_storage: ^9.2.0
   window_manager: ^0.4.0
   path_provider: ^2.1.0
+  flutter_local_notifications: ^22.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+# Upstream http2 cannot raise the connection-level flow-control window (it is
+# not a SETTINGS entry), which caps one tunnel session at roughly 64 KiB per
+# RTT. third_party/http2 is 2.3.1 plus that one patch; see the file header.
+dependency_overrides:
+  http2:
+    path: third_party/http2
 
 flutter:
   uses-material-design: true
@@ -33,6 +42,9 @@ flutter:
   assets:
     - assets/images/
     - assets/certs/
+    # flag-icons 7.2.3 (MIT, see assets/flags/LICENSE): Windows does not
+    # render flag emoji, so the server list ships the flags it needs.
+    - assets/flags/
     # Snapshot of the Remote Settings server list, used only when the online
     # fetch cannot reach Mozilla.
     - assets/data/

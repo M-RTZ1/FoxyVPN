@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'connection_mode.dart';
+import 'connection_mode_policy.dart';
+import 'secure_store.dart';
 import 'split_tunnel_rules.dart';
+
+export 'connection_mode.dart';
 
 enum UpstreamProxyType { socks5, http }
 
@@ -29,23 +33,6 @@ enum DohProvider {
 enum ThemeModeSetting { system, light, dark }
 
 enum AppLanguage { system, en, fa }
-
-/// The three mutually-exclusive operating modes of the VPN client.
-enum ConnectionMode {
-  /// Only the local SOCKS5/HTTP proxy server runs.
-  /// Applications must be manually configured to use it.
-  proxy,
-
-  /// The local SOCKS5/HTTP proxy runs AND the Windows system-wide proxy
-  /// setting (WinINet) is configured to point at it, so all WinINet-aware
-  /// apps (browsers, etc.) are routed automatically.
-  systemProxy,
-
-  /// Full system-wide VPN tunnel: hev-socks5-tunnel creates a Wintun
-  /// adapter, all IPv4 traffic is rerouted into it, and DNS is hijacked
-  /// through the mapdns engine. Requires administrator privileges.
-  tunnel,
-}
 
 /// Mirrors the Android `SettingsStore`. Windows has no per-app split
 /// tunneling equivalent — nothing under the wintun adapter identifies the
@@ -78,9 +65,6 @@ class SettingsStore extends ChangeNotifier {
   ];
 
   SharedPreferences? _prefs;
-  static const FlutterSecureStorage _secure = FlutterSecureStorage(
-    wOptions: WindowsOptions(),
-  );
 
   /// The `(address, port)` the local SOCKS5/HTTP frontend should listen on.
   /// Kept in step with [socksBindAddress] and [socksPort] so
@@ -134,6 +118,22 @@ class SettingsStore extends ChangeNotifier {
   bool get exitCheckEnabled => _p.getBool('exit_check_enabled') ?? true;
   set exitCheckEnabled(bool value) {
     _p.setBool('exit_check_enabled', value);
+    notifyListeners();
+  }
+
+  bool get connectionNotificationsEnabled =>
+      _p.getBool('connection_notifications_enabled') ?? true;
+  set connectionNotificationsEnabled(bool value) {
+    _p.setBool('connection_notifications_enabled', value);
+    notifyListeners();
+  }
+
+  /// When on, minimizing hides the window and leaves the VPN running; the
+  /// notification-area icon is the way back.
+  bool get minimizeToTrayEnabled =>
+      _p.getBool('minimize_to_tray_enabled') ?? false;
+  set minimizeToTrayEnabled(bool value) {
+    _p.setBool('minimize_to_tray_enabled', value);
     notifyListeners();
   }
 
@@ -197,8 +197,8 @@ class SettingsStore extends ChangeNotifier {
 
   /// What to do with a flow that matches no rule. Tunnel by default, so a
   /// missing rule can never leak traffic onto the plain network.
-  SplitTunnelAction get splitTunnelDefaultAction => SplitTunnelAction.values
-      .firstWhere(
+  SplitTunnelAction get splitTunnelDefaultAction =>
+      SplitTunnelAction.values.firstWhere(
         (a) => a.name == _p.getString('split_tunnel_default'),
         orElse: () => SplitTunnelAction.tunnel,
       );
@@ -247,10 +247,11 @@ class SettingsStore extends ChangeNotifier {
   ConnectionMode get connectionMode {
     // Migrate from the two legacy boolean flags the first time this is read.
     _migrateConnectionMode();
-    return ConnectionMode.values.firstWhere(
+    final stored = ConnectionMode.values.firstWhere(
       (m) => m.name == _p.getString('connection_mode'),
-      orElse: () => ConnectionMode.tunnel,
+      orElse: () => ConnectionModePolicy.defaultMode,
     );
+    return ConnectionModePolicy.resolve(stored);
   }
 
   set connectionMode(ConnectionMode value) {
@@ -271,8 +272,8 @@ class SettingsStore extends ChangeNotifier {
     } else if (wasProxyOnly == true) {
       _p.setString('connection_mode', ConnectionMode.proxy.name);
     } else {
-      // Default (full tunnel) or was already in tunnel mode.
-      _p.setString('connection_mode', ConnectionMode.tunnel.name);
+      // No legacy flags: use this platform's default mode.
+      _p.setString('connection_mode', ConnectionModePolicy.defaultMode.name);
     }
   }
 
@@ -321,14 +322,14 @@ class SettingsStore extends ChangeNotifier {
   }
 
   Future<String> get upstreamProxyUsername async =>
-      await _secure.read(key: 'upstream_proxy_username') ?? '';
+      await SecureStore.read('upstream_proxy_username') ?? '';
   Future<void> setUpstreamProxyUsername(String value) =>
-      _secure.write(key: 'upstream_proxy_username', value: value);
+      SecureStore.write('upstream_proxy_username', value);
 
   Future<String> get upstreamProxyPassword async =>
-      await _secure.read(key: 'upstream_proxy_password') ?? '';
+      await SecureStore.read('upstream_proxy_password') ?? '';
   Future<void> setUpstreamProxyPassword(String value) =>
-      _secure.write(key: 'upstream_proxy_password', value: value);
+      SecureStore.write('upstream_proxy_password', value);
 
   /// Path to the hev-socks5-tunnel Windows binary (bundled or user-provided).
   String get hevTunnelBinaryPath =>

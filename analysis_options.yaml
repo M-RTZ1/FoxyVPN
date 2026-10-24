@@ -9,6 +9,19 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # Reference project kept for comparison; it has its own pubspec and is not
+    # part of this app's build.
+    - firefox-vpn-client-main/**
+    # Vendored upstream packages are compiled but not linted. third_party/http2
+    # carries a local flow-control patch documented in lib/src/connection.dart.
+    - third_party/**
+    - build/**
+    - windows/**
+    - macos/**
+    - linux/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

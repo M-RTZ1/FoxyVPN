@@ -12,10 +12,10 @@ class AppVersion {
 
   static const String _fallback = '0.0.0';
 
-  /// pubspec's `version:` field, e.g. `1.0.0+3`.
+  /// pubspec's `version:` field, e.g. `3.0.0+4`.
   static String _full = _fallback;
 
-  /// `1.0.0+3` — also what a GitHub release tag is compared against, since
+  /// `3.0.0+4` — also what a GitHub release tag is compared against, since
   /// this project ships build-number-only updates.
   static String get full => _full;
 

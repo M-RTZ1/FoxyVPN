@@ -35,6 +35,9 @@ class _FakeStream {
 
 class _FakeSession implements UpstreamSession {
   final List<_FakeStream> streams = [];
+  int? rejectStatus;
+  Object? openError;
+  int openAttempts = 0;
 
   @override
   bool get isConnected => true;
@@ -42,6 +45,17 @@ class _FakeSession implements UpstreamSession {
   Future<void> connect() async {}
   @override
   Future<TunneledStream> openStream(String host, int port) async {
+    openAttempts++;
+    final error = openError;
+    if (error != null) throw error;
+    final status = rejectStatus;
+    if (status != null) {
+      throw UpstreamConnectRejectedException(
+        statusCode: status,
+        authority: '$host:$port',
+        message: 'rejected by the edge',
+      );
+    }
     final stream = _FakeStream(host, port);
     streams.add(stream);
     return stream.tunneled;
@@ -59,12 +73,17 @@ class _Collector {
   _Collector(Socket socket) {
     socket.listen(
       (bytes) => received.addAll(bytes),
-      onError: (Object _) {},
-      onDone: () {},
+      onError: (Object _) => _completeClosed(),
+      onDone: _completeClosed,
     );
   }
 
   final List<int> received = [];
+  final Completer<void> closed = Completer<void>();
+
+  void _completeClosed() {
+    if (!closed.isCompleted) closed.complete();
+  }
 
   Future<void> _until(bool Function() condition) async {
     for (var i = 0; i < 150; i++) {
@@ -93,14 +112,17 @@ void main() {
   late _FakeSession session;
   late LocalSocks5Server server;
   late _Collector clientOut;
+  var unhealthyCalls = 0;
 
   setUp(() async {
     session = _FakeSession();
+    unhealthyCalls = 0;
     server = LocalSocks5Server(
       bindAddress: '127.0.0.1',
       port: 0,
       rejectFakeDnsAddresses: false,
       sessionProvider: () => session,
+      onSessionUnhealthy: () => unhealthyCalls++,
     );
     await server.start();
   });
@@ -111,6 +133,20 @@ void main() {
     final socket = await Socket.connect('127.0.0.1', server.boundPort);
     final collector = _Collector(socket);
     return (socket: socket, collector: collector);
+  }
+
+  Future<int> socksConnectReply(String host, int port) async {
+    final client = await connectClient();
+    client.socket.add([0x05, 0x01, 0x00]);
+    await client.collector.exactly(2);
+    final hostBytes = utf8.encode(host);
+    client.socket.add([
+      0x05, 0x01, 0x00, 0x03, hostBytes.length, ...hostBytes,
+      (port >> 8) & 0xFF, port & 0xFF,
+    ]);
+    final reply = await client.collector.exactly(10);
+    client.socket.destroy();
+    return reply[1];
   }
 
   test('SOCKS5 CONNECT still works on the mixed port', () async {
@@ -193,5 +229,64 @@ void main() {
     final head = await clientOut.textUntil('\r\n\r\n');
     expect(head, startsWith('HTTP/1.1 400'));
     client.socket.destroy();
+  });
+
+  test('a 502 on a proxied port is retried instead of being remembered',
+      () async {
+    session.rejectStatus = 502;
+
+    expect(await socksConnectReply('rr1---sn-a.example', 443), 0x04);
+    expect(await socksConnectReply('rr1---sn-a.example', 443), 0x04);
+
+    expect(session.openAttempts, 2,
+        reason: 'a transient gateway error must not blacklist the host');
+  });
+
+  test('a refusal on a port the edge does not proxy is remembered', () async {
+    session.rejectStatus = 502;
+
+    expect(await socksConnectReply('example.org', 9898), 0x04);
+    expect(await socksConnectReply('example.org', 9898), 0x04);
+
+    expect(session.openAttempts, 1,
+        reason: 'the second attempt should be refused on-device');
+  });
+
+  test('a saturated session is busy, not unhealthy', () async {
+    session.openError = UpstreamConnectSaturatedException(
+      authority: 'rr1---sn-a.example:443',
+      message: 'all stream slots are in use',
+    );
+
+    for (var i = 0; i < 12; i++) {
+      expect(await socksConnectReply('rr$i---sn-a.example', 443), 0x01);
+    }
+
+    expect(session.openAttempts, 12,
+        reason: 'a busy session must not blacklist a destination locally');
+    expect(unhealthyCalls, 0,
+        reason: 'saturation says nothing about the tunnel\'s health');
+  });
+
+  test('a broken tunnel releases the client instead of holding it for the '
+      'drain timeout', () async {
+    final client = await connectClient();
+    clientOut = client.collector;
+    client.socket.add([0x05, 0x01, 0x00]);
+    await clientOut.exactly(2);
+
+    final host = utf8.encode('rr1---sn-a.example');
+    client.socket.add([
+      0x05, 0x01, 0x00, 0x03, host.length, ...host, 0x01, 0xBB, // port 443
+    ]);
+    expect((await clientOut.exactly(10))[1], 0x00);
+
+    session.streams.single.inputCtl
+        .addError(const SocketException('the tunnel died mid-flow'));
+
+    await clientOut.closed.future.timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => fail('the client was left holding a dead flow'),
+    );
   });
 }
